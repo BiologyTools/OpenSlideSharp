@@ -6,6 +6,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.1.1</Version>
     <PlatformTargets>x64;arm64</PlatformTargets>
+    <StartupObject>SlideLibrary.Demo.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +23,10 @@
     <PackageReference Include="AForgeBio" Version="1.4.3" />
     <PackageReference Include="GtkSharp" Version="3.24.24.95" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
+    <PackageReference Include="Mapsui.Rendering.Skia" Version="4.1.1" />
+    <PackageReference Include="SkiaSharp.Views.Forms" Version="2.88.6" />
+    <PackageReference Include="SkiaSharp.Views.Forms.GTK" Version="2.88.6" />
+    <PackageReference Include="SkiaSharp.Views.Gtk3" Version="2.88.6" />
   </ItemGroup>
 
   <ItemGroup>

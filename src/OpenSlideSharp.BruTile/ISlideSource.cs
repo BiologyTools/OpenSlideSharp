@@ -38,12 +38,17 @@ namespace OpenSlideSharp.BruTile
                 if (!string.IsNullOrEmpty(OpenSlideBase.DetectVendor(source)))
                     return new OpenSlideBase(source, enableCache);
             }
-            catch (Exception) { }
+            catch (Exception e)
+            { 
+                Console.WriteLine(e);
+            }
             return null;
         }
         #endregion
 
         public abstract byte[] GetTile(TileInfo tileInfo);
+
+        public abstract System.Threading.Tasks.Task<byte[]> GetTileAsync(TileInfo tileInfo);
 
         public double MinUnitsPerPixel { get; protected set; }
 

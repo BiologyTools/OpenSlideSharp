@@ -1,4 +1,5 @@
 ﻿using BruTile;
+using Mapsui;
 using Mapsui.Fetcher;
 using Mapsui.Layers;
 using Mapsui.Providers;
@@ -13,7 +14,7 @@ namespace SlideLibrary.Demo
     /// <summary>
     /// Slide tile layer
     /// </summary>
-    public class SlideTileLayer : TileLayer
+    public class SlideTileLayer : Mapsui.Layers.Layer
     {
         private ISlideSource _slideSource;
 
@@ -21,14 +22,17 @@ namespace SlideLibrary.Demo
             ISlideSource source = null,
             int minTiles = 200,
             int maxTiles = 300,
-            IDataFetchStrategy dataFetchStrategy = null,
-            IRenderFetchStrategy renderFetchStrategy = null,
+            //IDataFetchStrategy dataFetchStrategy = null,
+            //IRenderFetchStrategy renderFetchStrategy = null,
             int minExtraTiles = -1,
             int maxExtraTiles = -1,
-            Func<TileInfo, Feature> fetchTileAsFeature = null)
-            : base(source, minTiles, maxTiles, dataFetchStrategy, renderFetchStrategy, minExtraTiles, maxExtraTiles, fetchTileAsFeature)
+            Func<TileInfo, IFeature> fetchTileAsFeature = null)
+            : base()
         {
-            Name = "TileLayer";
+            this.Name = "TileLayer";
+            this.MinVisible = minTiles;
+            this.MaxVisible = maxTiles;
+            //source, minTiles, maxTiles, dataFetchStrategy, renderFetchStrategy, minExtraTiles, maxExtraTiles, fetchTileAsFeature
             _slideSource = source;
         }
 

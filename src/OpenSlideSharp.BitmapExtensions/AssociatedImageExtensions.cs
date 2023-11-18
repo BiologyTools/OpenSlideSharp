@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using AForge;
 using System.IO;
 
 namespace OpenSlideSharp.BitmapExtensions
@@ -30,7 +29,7 @@ namespace OpenSlideSharp.BitmapExtensions
         /// <param name="image"></param>
         /// <param name="quality"></param>
         /// <returns></returns>
-
+        /*
         public static byte[] ToJpeg(this AssociatedImage image, int? quality = null)
         {
             using (var ms = ToJpegStream(image, quality))
@@ -38,7 +37,7 @@ namespace OpenSlideSharp.BitmapExtensions
                 return ms.ToArray();
             }
         }
-
+        /*
         /// <summary>
         /// To jpeg stream
         /// </summary>
@@ -50,7 +49,8 @@ namespace OpenSlideSharp.BitmapExtensions
         {
             return ToBitmap(image).ToStream(ImageFormat.Jpeg, quality);
         }
-
+        */
+        /*
         /// <summary>
         /// To png array.
         /// </summary>
@@ -75,6 +75,7 @@ namespace OpenSlideSharp.BitmapExtensions
         {
             return ToBitmap(image).ToStream(ImageFormat.Png, quality);
         }
+        */
     }
 
 

@@ -3,6 +3,7 @@ using BruTile.Cache;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace OpenSlideSharp.BruTile
 {
@@ -68,6 +69,29 @@ namespace OpenSlideSharp.BruTile
             var dst = ImageUtil.GetJpeg(bgraData, 4, curTileWidth * 4, curTileWidth, curTileHeight, tileWidth, tileHeight);
             if (_enableCache && dst != null)
                 _tileCache.Add(tileInfo.Index, dst);
+            return dst;
+        }
+
+        public override async Task<byte[]> GetTileAsync(TileInfo tileInfo)
+        {
+            byte[] dst = null;
+            await Task.Run(() =>
+            {
+                if (tileInfo == null) return null;
+                if (_enableCache && _tileCache.Find(tileInfo.Index) is byte[] output) return output;
+                var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
+                var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
+                var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
+                var curLevelOffsetXPixel = tileInfo.Extent.MinX / MinUnitsPerPixel;
+                var curLevelOffsetYPixel = -tileInfo.Extent.MaxY / MinUnitsPerPixel;
+                var curTileWidth = (int)(tileInfo.Extent.MaxX > Schema.Extent.Width ? tileWidth - (tileInfo.Extent.MaxX - Schema.Extent.Width) / r : tileWidth);
+                var curTileHeight = (int)(-tileInfo.Extent.MinY > Schema.Extent.Height ? tileHeight - (-tileInfo.Extent.MinY - Schema.Extent.Height) / r : tileHeight);
+                var bgraData = SlideImage.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, curTileWidth, curTileHeight);
+                dst = ImageUtil.GetJpeg(bgraData, 4, curTileWidth * 4, curTileWidth, curTileHeight, tileWidth, tileHeight);
+                if (_enableCache && dst != null)
+                    _tileCache.Add(tileInfo.Index, dst);
+                return dst;
+            });
             return dst;
         }
 
