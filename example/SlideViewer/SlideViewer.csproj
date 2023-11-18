@@ -2,24 +2,33 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFrameworks>net48;netcoreapp3.1</TargetFrameworks>
-    <UseWPF>true</UseWPF>
+    <TargetFrameworks>net6</TargetFrameworks>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.1.1</Version>
+    <PlatformTargets>x64;arm64</PlatformTargets>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BruTile" Version="[4.0.0,5)" />
-    <PackageReference Include="Newtonsoft.Json" Version="[13.0.1,)" />
-    <PackageReference Include="Mapsui.Wpf" Version="[3.0.2,4)" />
-    <PackageReference Include="MaterialDesignThemes" Version="[4.2.1,5)" />
-    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="[1.1.39,2)" />
-    <PackageReference Include="OpenCvSharp4.Windows" Version="[4.6.0.20220608,)" />
+    <None Remove="Glade\SlideView.glade" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OpenSlideSharp.BruTile\OpenSlideSharp.BruTile.csproj" />
-    <ProjectReference Include="..\..\src\OpenSlideSharp.runtime.win\OpenSlideSharp.runtime.win.csproj" />
+    <Content Include="Glade\SlideView.glade">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AForgeBio" Version="1.4.3" />
+    <PackageReference Include="GtkSharp" Version="3.24.24.95" />
+    <PackageReference Include="Mapsui" Version="4.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenSlideSharp.BitmapExtensions\OpenSlideGTK.BitmapExtensions.csproj" />
+    <ProjectReference Include="..\..\src\OpenSlideSharp.BruTile\OpenSlideGTK.BruTile.csproj" />
+    <ProjectReference Include="..\..\src\OpenSlideSharp.OpencvExtensions\OpenSlideGTK.OpencvExtensions.csproj" />
+    <ProjectReference Include="..\..\src\OpenSlideSharp\OpenSlideGTK.csproj" />
   </ItemGroup>
 
 </Project>

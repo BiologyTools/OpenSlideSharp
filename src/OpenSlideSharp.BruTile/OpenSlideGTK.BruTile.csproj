@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="$(SolutionDir)/OpenSlideSharp.Common.props" />
+
+  <PropertyGroup>
+    <TargetFrameworks>net6</TargetFrameworks>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>1701;1702;1591;NU1603</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>OpenSlideSharp.BruTile</PackageId>
+    <PackageTags>openslide image brutile</PackageTags>
+    <PackageReleaseNotes>OpenSlideSharp for BruTile</PackageReleaseNotes>
+    <Description>OpenSlideSharp for BruTile</Description>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <Version>1.1.2</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\Erikr\.nuget\packages\opencvsharp4.runtime.win\4.3.0.20200405\build\netcoreapp\..\..\runtimes\win-x64\native\OpenCvSharpExtern.dll" />
+    <Content Remove="C:\Users\Erikr\.nuget\packages\opencvsharp4.runtime.win\4.3.0.20200405\build\netcoreapp\..\..\runtimes\win-x64\native\opencv_videoio_ffmpeg430_64.dll" />
+    <Content Remove="C:\Users\Erikr\.nuget\packages\opencvsharp4.runtime.win\4.3.0.20200405\build\netcoreapp\..\..\runtimes\win-x86\native\OpenCvSharpExtern.dll" />
+    <Content Remove="C:\Users\Erikr\.nuget\packages\opencvsharp4.runtime.win\4.3.0.20200405\build\netcoreapp\..\..\runtimes\win-x86\native\opencv_videoio_ffmpeg430.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BruTile" Version="[4,5)" />
+    <PackageReference Include="OpenCvSharp4" Version="4.8.0.20230708" />
+    <PackageReference Include="OpenCvSharp4.runtime.linux-arm" Version="4.8.0.20230708" />
+    <PackageReference Include="OpenCvSharp4.runtime.osx.10.15-universal" Version="4.7.0.20230224" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.8.0.20230708" />
+    <PackageReference Include="OpenCvSharp4_.runtime.ubuntu.20.04-x64" Version="4.8.0.20230708" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSlideSharp\OpenSlideGTK.csproj" />
+  </ItemGroup>
+
+
+
+</Project>
