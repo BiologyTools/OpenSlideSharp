@@ -2,7 +2,6 @@
 
 A slide viewer tool.
 
-- WPF
+- GTK
 - BruTile
 - Mapsui
-- MaterialDesignThemes

@@ -2,7 +2,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using AForge;
+
 namespace OpenSlideSharp.BitmapExtensions
 {
     /// <summary>
@@ -29,7 +29,7 @@ namespace OpenSlideSharp.BitmapExtensions
                 return new Bitmap((int)width, (int)height, (int)width * 4, PixelFormat.Format32bppArgb, (IntPtr)scan0);
             }
         }
-        /*
+
         /// <summary>
         /// Read region jpeg stream.
         /// </summary>
@@ -45,8 +45,7 @@ namespace OpenSlideSharp.BitmapExtensions
         {
             return ReadRegionImage(image, level, x, y, width, height).ToStream(ImageFormat.Jpeg, quality);
         }
-        */
-        /*
+
         /// <summary>
         /// Read region jpeg
         /// </summary>
@@ -66,8 +65,7 @@ namespace OpenSlideSharp.BitmapExtensions
                 return ms.ToArray();
             }
         }
-        */
-        /*
+
         /// <summary>
         /// Read region png stream.
         /// </summary>
@@ -83,8 +81,7 @@ namespace OpenSlideSharp.BitmapExtensions
         {
             return ReadRegionImage(image, level, x, y, width, height).ToStream(ImageFormat.Png, quality);
         }
-        */
-        /*
+
         /// <summary>
         /// Read region png.
         /// </summary>
@@ -103,8 +100,7 @@ namespace OpenSlideSharp.BitmapExtensions
                 return ms.ToArray();
             }
         }
-        */
-        /*
+
         /// <summary>
         /// Generate thumbnail image.
         /// </summary>
@@ -140,7 +136,7 @@ namespace OpenSlideSharp.BitmapExtensions
 
             using (var bitmap = ReadRegionImage(image, level, 0, 0, levelWidth, levelHeight))
             {
-                return new Bitmap(bitmap, targetWidth, targetHeight);
+                return new Bitmap(bitmap, new Size(targetWidth, targetHeight));
             }
         }
 
@@ -219,7 +215,6 @@ namespace OpenSlideSharp.BitmapExtensions
                 return ms.ToArray();
             }
         }
-        */
     }
 
 

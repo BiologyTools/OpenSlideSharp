@@ -3,7 +3,7 @@
   <Import Project="$(SolutionDir)/OpenSlideSharp.Common.props" />
   
   <PropertyGroup>
-    <TargetFrameworks>net6</TargetFrameworks>
+    <TargetFramework>net6</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>

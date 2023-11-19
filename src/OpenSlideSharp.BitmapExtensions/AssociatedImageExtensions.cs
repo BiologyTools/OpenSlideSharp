@@ -1,7 +1,8 @@
 ﻿using System;
-using AForge;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
-
+using AForge;
 namespace OpenSlideSharp.BitmapExtensions
 {
     /// <summary>
@@ -23,59 +24,6 @@ namespace OpenSlideSharp.BitmapExtensions
             }
         }
 
-        /// <summary>
-        /// To jpeg array
-        /// </summary>
-        /// <param name="image"></param>
-        /// <param name="quality"></param>
-        /// <returns></returns>
-        /*
-        public static byte[] ToJpeg(this AssociatedImage image, int? quality = null)
-        {
-            using (var ms = ToJpegStream(image, quality))
-            {
-                return ms.ToArray();
-            }
-        }
-        /*
-        /// <summary>
-        /// To jpeg stream
-        /// </summary>
-        /// <param name="image"></param>
-        /// <param name="quality"></param>
-        /// <returns></returns>
-
-        public static MemoryStream ToJpegStream(this AssociatedImage image, int? quality = null)
-        {
-            return ToBitmap(image).ToStream(ImageFormat.Jpeg, quality);
-        }
-        */
-        /*
-        /// <summary>
-        /// To png array.
-        /// </summary>
-        /// <param name="image"></param>
-        /// <param name="quality"></param>
-        /// <returns></returns>
-        public static byte[] ToPng(this AssociatedImage image, int? quality = null)
-        {
-            using (var ms = ToPngStream(image, quality))
-            {
-                return ms.ToArray();
-            }
-        }
-
-        /// <summary>
-        /// To png stream.
-        /// </summary>
-        /// <param name="image"></param>
-        /// <param name="quality"></param>
-        /// <returns></returns>
-        public static MemoryStream ToPngStream(this AssociatedImage image, int? quality = null)
-        {
-            return ToBitmap(image).ToStream(ImageFormat.Png, quality);
-        }
-        */
     }
 
 

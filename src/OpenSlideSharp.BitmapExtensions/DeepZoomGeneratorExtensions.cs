@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using static OpenSlideSharp.DeepZoomGenerator;
-using AForge;
+
 namespace OpenSlideSharp.BitmapExtensions
 {
     /// <summary>
@@ -11,7 +11,6 @@ namespace OpenSlideSharp.BitmapExtensions
     /// </summary>
     public static class DeepZoomGeneratorExtensions
     {
-        /*
         /// <summary>
         /// Get tile as jpeg.
         /// </summary>
@@ -29,7 +28,7 @@ namespace OpenSlideSharp.BitmapExtensions
                 return ms.ToArray();
             }
         }
-        
+
         /// <summary>
         /// Get tile as jpeg stream.
         /// </summary>
@@ -45,8 +44,7 @@ namespace OpenSlideSharp.BitmapExtensions
             return GetTileImage(generator, level, col, row, out tileInfo).ToStream(ImageFormat.Jpeg, quality);
 
         }
-        */
-        /*
+
         /// <summary>
         /// Get tile as png.
         /// </summary>
@@ -79,7 +77,7 @@ namespace OpenSlideSharp.BitmapExtensions
         {
             return GetTileImage(generator, level, col, row, out tileInfo).ToStream(ImageFormat.Png, quality);
         }
-        */
+
         /// <summary>
         /// Get tile image stream.
         /// </summary>

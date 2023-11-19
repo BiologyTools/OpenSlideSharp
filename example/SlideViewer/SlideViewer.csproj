@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFrameworks>net6</TargetFrameworks>
+    <TargetFramework>net6</TargetFramework>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.1.1</Version>
-    <PlatformTargets>x64;arm64</PlatformTargets>
     <StartupObject>SlideLibrary.Demo.Program</StartupObject>
+    <UseWPF>False</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,19 +21,16 @@
 
   <ItemGroup>
     <PackageReference Include="AForgeBio" Version="1.4.3" />
-    <PackageReference Include="GtkSharp" Version="3.24.24.95" />
+    <PackageReference Include="BruTile" Version="[4.0.0,5)" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
     <PackageReference Include="Mapsui.Rendering.Skia" Version="4.1.1" />
-    <PackageReference Include="SkiaSharp.Views.Forms" Version="2.88.6" />
-    <PackageReference Include="SkiaSharp.Views.Forms.GTK" Version="2.88.6" />
-    <PackageReference Include="SkiaSharp.Views.Gtk3" Version="2.88.6" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="[4.6.0.20220608,)" />
+    <PackageReference Include="GTKSharp" Version="3.24.24.95" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OpenSlideSharp.BitmapExtensions\OpenSlideGTK.BitmapExtensions.csproj" />
     <ProjectReference Include="..\..\src\OpenSlideSharp.BruTile\OpenSlideGTK.BruTile.csproj" />
-    <ProjectReference Include="..\..\src\OpenSlideSharp.OpencvExtensions\OpenSlideGTK.OpencvExtensions.csproj" />
-    <ProjectReference Include="..\..\src\OpenSlideSharp\OpenSlideGTK.csproj" />
   </ItemGroup>
 
 </Project>
