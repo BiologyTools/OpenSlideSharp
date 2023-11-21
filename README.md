@@ -1,19 +1,11 @@
 
 ![openslide](./openslide_logo.png)
 
-[![Build status](https://ci.appveyor.com/api/projects/status/ko0mj0nw8tldqlmn?svg=true)](https://ci.appveyor.com/project/IOL0ol1/openslidesharp)
-[![Nuget download](https://img.shields.io/nuget/dt/OpenSlideSharp)](https://www.nuget.org/packages?q=OpenSlideSharp)
-[![Nuget version](https://img.shields.io/nuget/v/OpenSlideSharp)](https://www.nuget.org/packages?q=OpenSlideSharp)
+# OpenSlideGTK
+.NET6 Cross Platform version of OpenSlideSharp (http://openslide.org/).
 
-# OpenSlideSharp
-.NET bindings for OpenSlide (http://openslide.org/).    
-
-Thanks to @yigolden for his work in [OpenSlideNET](https://github.com/yigolden/OpenSlideNET).
-
-Nuget    
-```ps
-Install-Package OpenSlideSharp.Windows -Version 1.1.0
-```
+Thank you to @IOL0ol1 for his work on [OpenSlideSharp](https://github.com/IOL0ol1/OpenSlideSharp).
+Thank you to @yigolden for his work on [OpenSlideNET](https://github.com/yigolden/OpenSlideNET).
 
 ## Index
 
@@ -21,13 +13,7 @@ Install-Package OpenSlideSharp.Windows -Version 1.1.0
     openslide warpper, include DeepZoomGenerator, but no native *.dll.
 
 2.  [OpenSlideSharp.BitmapExtensions](/src/OpenSlideSharp.BitmapExtensions)    
-    **NOTE: Manual install "libgdiplus" for linux to support System.Drawing.Bitmap**    
-    OpenSlideSharp with System.Drawing.Bitmap extensions.    
-    bgra raw data    
-    -ToJepg    
-    -ToPng    
-    -ToBitmap    
-    ...
+    -Removed System.Drawing Dependency to support all platforms.
 
 3.  [OpenSlideSharp.OpencvExtensions](/src/OpenSlideSharp.OpencvExtensions)       
     OpenSlideSharp with OpenCV mat extensions.    
