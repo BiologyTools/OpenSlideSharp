@@ -3,20 +3,12 @@ using Gdk;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AForge;
-using Point = AForge.PointD;
-using Color = AForge.Color;
-using Rectangle = AForge.Rectangle;
+using Point = Mapsui.MPoint;
 using System.IO;
 using Mapsui;
 using OpenSlideSharp.BruTile;
-using SlideLibrary.Demo;
-using System.Collections.ObjectModel;
-using System.Reflection;
-using Mapsui.UI;
-using Mapsui.Extensions;
 using Mapsui.Rendering.Skia;
-using OpenCvSharp;
+using Mapsui.Extensions;
 
 namespace SlideLibrary.Demo
 {
@@ -42,9 +34,28 @@ namespace SlideLibrary.Demo
             SlideView v = new SlideView(builder, builder.GetObject("slideView").Handle,file);
             return v;
         }
+        public static SlideView Create()
+        {
+            Builder builder = new Builder(new FileStream(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/" + "Glade/SlideView.glade", FileMode.Open));
+            SlideView v = new SlideView(builder, builder.GetObject("slideView").Handle, "");
+            return v;
+        }
 
         protected SlideView(Builder builder, IntPtr handle,string file) : base(handle)
         {
+            if (file == "")
+            {
+                Gtk.FileChooserDialog filechooser =
+            new Gtk.FileChooserDialog("Pick Slide Image to Open with OpenSlide",
+                this,
+                FileChooserAction.Open,
+                "Cancel", ResponseType.Cancel,
+                "Save", ResponseType.Accept);
+                if (filechooser.Run() != (int)ResponseType.Accept)
+                    return;
+                filechooser.Hide();
+                file = filechooser.Filename;
+            }
             _builder = builder;
             builder.Autoconnect(this);
             SetupHandlers();
@@ -80,14 +91,15 @@ namespace SlideLibrary.Demo
         private void PictureBox_Drawn(object o, DrawnArgs e)
         {
             Title = MainMap.Navigator.Viewport.ToString();
-            MemoryStream ms = rend.RenderToBitmapStream(MainMap.Navigator.Viewport, MainMap.Layers, MainMap.BackColor);
+            MRect rect = MainMap.Navigator.Viewport.ToExtent();
+            slice.GetFeatures(rect, resolution);
             Pixbuf pf = slice.buffer;
-            if (pf == null) return;
+            if (pf == null) { Console.WriteLine("No Image"); return; }
             Gdk.CairoHelper.SetSourcePixbuf(e.Cr,pf, 0, 0);
             e.Cr.Paint();
             pf.Dispose();
         }
-        Point pp;
+        Point pp = new Point(0, 0);
         Point Origin
         {
             get { return pp; }
@@ -207,14 +219,17 @@ namespace SlideLibrary.Demo
         {
             MainMap = new Map();
             MainMap.BackColor = new Mapsui.Styles.Color(0, 0, 0);
-            rend = new MapRenderer();
             if (_slideSource != null) (_slideSource as IDisposable).Dispose();
             _slideSource = SlideSourceBase.Create(file);
-            if (_slideSource == null) return;
+            if (_slideSource == null)
+            {
+                Console.WriteLine("Failed to load image with OpenSlide.");
+                return;
+            }
             InitMain(_slideSource);
+            Console.WriteLine("Initialization Complete.");
         }
         Map MainMap;
-        MapRenderer rend;
         /// <summary>
         /// Init main map
         /// </summary>
@@ -223,6 +238,7 @@ namespace SlideLibrary.Demo
         {
             MainMap.Layers.Clear();
             tile = new SlideTileLayer(_slideSource);
+            tile.Enabled = true;
             slice = new SlideSliceLayer(_slideSource);
             MainMap.Layers.Add(tile);
             MainMap.Layers.Add(slice);

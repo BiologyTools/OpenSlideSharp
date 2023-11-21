@@ -11,8 +11,16 @@ namespace SlideLibrary.Demo
         static void Main(string[] args)
         {
             Application.Init();
-            SlideView view = SlideView.Create(args[0]);
-            view.Show();
+            if (args.Length == 0)
+            {
+                SlideView view = SlideView.Create();
+                view.Show();
+            }
+            else
+            {
+                SlideView view = SlideView.Create(args[0]);
+                view.Show();
+            }
             Application.Run();
         }
     }

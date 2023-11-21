@@ -3,34 +3,37 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net6</TargetFramework>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;win-arm64;osx-x64;osx-arm64;</RuntimeIdentifiers>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.1.1</Version>
+    <Version>1.0.0</Version>
     <StartupObject>SlideLibrary.Demo.Program</StartupObject>
     <UseWPF>False</UseWPF>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>OpenSlideGTK</Title>
+    <Authors>Erik Repo</Authors>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Remove="Glade\SlideView.glade" />
-  </ItemGroup>
-
+  
   <ItemGroup>
     <Content Include="Glade\SlideView.glade">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>True</Pack>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
     </Content>
   </ItemGroup>
-
+  
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="1.4.3" />
     <PackageReference Include="BruTile" Version="[4.0.0,5)" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
     <PackageReference Include="Mapsui.Rendering.Skia" Version="4.1.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="OpenCvSharp4.Windows" Version="[4.6.0.20220608,)" />
     <PackageReference Include="GTKSharp" Version="3.24.24.95" />
+    <PackageReference Include="Packaging.Targets" Version="0.1.220">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
-
+  
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OpenSlideSharp.BruTile\OpenSlideGTK.BruTile.csproj" />
+    <ProjectReference Include="..\..\src\OpenSlideGTK.BruTile\OpenSlideGTK.BruTile.csproj" />
   </ItemGroup>
 
 </Project>
