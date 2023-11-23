@@ -1,16 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net6</TargetFramework>
     <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;win-arm64;osx-x64;osx-arm64;</RuntimeIdentifiers>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.1.1</Version>
-    <StartupObject>SlideLibrary.Demo.Program</StartupObject>
+    <StartupObject>SlideViewer.Program</StartupObject>
   </PropertyGroup>
-  <ItemGroup>
-    <None Remove="Glade\SlideView.glade" />
-  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Glade\SlideView.glade">
@@ -24,15 +20,12 @@
     <PackageReference Include="GtkSharp" Version="3.24.24.95" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
     <PackageReference Include="Mapsui.Extensions" Version="4.1.1" />
-    <PackageReference Include="Mapsui.Rendering.Skia" Version="4.1.1" />
     <PackageReference Include="Mapsui.Tiling" Version="4.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="OpenCvSharp4.Windows" Version="4.8.0.20230708" />
     <PackageReference Include="Packaging.Targets" Version="0.1.220">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="SkiaSharp.Views.Forms" Version="2.88.6" />
   </ItemGroup>
 
   <ItemGroup>

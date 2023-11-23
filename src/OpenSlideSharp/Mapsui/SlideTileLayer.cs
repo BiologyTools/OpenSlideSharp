@@ -7,13 +7,12 @@ using Mapsui.Rendering;
 using Mapsui.Tiling.Fetcher;
 using Mapsui.Tiling.Layers;
 using Mapsui.Tiling.Rendering;
-using OpenSlideGTK;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace SlideLibrary.Demo
+namespace OpenSlideGTK
 {
     /// <summary>
     /// Slide tile layer

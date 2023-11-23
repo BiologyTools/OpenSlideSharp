@@ -11,8 +11,7 @@ using BruTile.Predefined;
 using Mapsui.Tiling.Layers;
 using Mapsui.Tiling.Fetcher;
 using OpenSlideGTK;
-
-namespace SlideLibrary.Demo
+namespace SlideViewer
 {
     public class SlideView : Gtk.Window
     {

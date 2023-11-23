@@ -1,7 +1,7 @@
 using Gtk;
 using Application = Gtk.Application;
 
-namespace SlideLibrary.Demo
+namespace SlideViewer
 {
     internal static class Program
     {

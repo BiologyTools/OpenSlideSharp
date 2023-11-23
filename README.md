@@ -1,11 +1,9 @@
 
 ![openslide](./openslide_logo.png)
 
-[![Build status](https://ci.appveyor.com/api/projects/status/ko0mj0nw8tldqlmn?svg=true)](https://ci.appveyor.com/project/IOL0ol1/openslidesharp)
-[![Nuget download](https://img.shields.io/nuget/dt/OpenSlideSharp)](https://www.nuget.org/packages?q=OpenSlideSharp)
-[![Nuget version](https://img.shields.io/nuget/v/OpenSlideSharp)](https://www.nuget.org/packages?q=OpenSlideSharp)
+[![NuGet version (OpenSlideGTK)](https://img.shields.io/nuget/v/OpenSlideGTK.svg?style=flat-square)](https://www.nuget.org/packages/OpenSlideGTK/1.1.0)
 
-# OpenSlideSharp
+# OpenSlideGTK
 .NET6 cross-platform Windows, Linux, Mac, bindings for OpenSlide (http://openslide.org/).    
 
 Thank you to @IOL0ol1 for his work on [OpenSlideSharp](https://github.com/IOL0ol1/OpenSlideSharp).
@@ -14,7 +12,7 @@ Thank you to @yigolden for his work on [OpenSlideNET](https://github.com/yigolde
 
 Nuget    
 ```ps
-Install-Package OpenSlideGTK -Version 1.0.0
+Install-Package OpenSlideGTK -Version 1.1.0
 ```
 
 ## Index
