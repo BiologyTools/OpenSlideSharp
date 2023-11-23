@@ -1,7 +1,7 @@
 
 ![openslide](./openslide_logo.png)
 
-# OpenSlideSharp
+# OpenSlideGTK
 .NET6 cross-platform Windows, Linux, Mac, bindings for OpenSlide (http://openslide.org/).    
 
 Thank you to @IOL0ol1 for his work on [OpenSlideSharp](https://github.com/IOL0ol1/OpenSlideSharp).
