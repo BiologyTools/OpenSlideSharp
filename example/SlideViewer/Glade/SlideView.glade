@@ -6,12 +6,8 @@
     <property name="can-focus">False</property>
     <child>
       <object class="GtkDrawingArea" id="pictureBox">
-        <property name="width-request">400</property>
-        <property name="height-request">400</property>
         <property name="visible">True</property>
         <property name="can-focus">False</property>
-        <property name="hexpand">True</property>
-        <property name="vexpand">True</property>
       </object>
     </child>
   </object>

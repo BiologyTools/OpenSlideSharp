@@ -1,36 +1,41 @@
 ﻿using BruTile;
+using Mapsui;
 using Mapsui.Fetcher;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Rendering;
-using OpenSlideSharp.BruTile;
+using Mapsui.Tiling.Fetcher;
+using Mapsui.Tiling.Layers;
+using Mapsui.Tiling.Rendering;
+using OpenSlideGTK;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace SlideLibrary.Demo
 {
     /// <summary>
     /// Slide tile layer
     /// </summary>
-    public class SlideTileLayer : ImageLayer
+    public class SlideTileLayer : TileLayer
     {
         private ISlideSource _slideSource;
 
         public SlideTileLayer(
-            ISlideSource source = null)//,
-            //int minTiles = 200,
-            //int maxTiles = 300,
-            //IDataFetchStrategy dataFetchStrategy = null,
-            //IRenderFetchStrategy renderFetchStrategy = null,
-            //int minExtraTiles = -1,
-            //int maxExtraTiles = -1,
-            //Func<TileInfo, Feature> fetchTileAsFeature = null)
-            : base()//: base(source, minTiles, maxTiles, dataFetchStrategy, renderFetchStrategy, minExtraTiles, maxExtraTiles, fetchTileAsFeature)
-            {
+            ISlideSource source = null,
+            int minTiles = 200,
+            int maxTiles = 300,
+            IDataFetchStrategy dataFetchStrategy = null,
+            IRenderFetchStrategy renderFetchStrategy = null,
+            int minExtraTiles = -1,
+            int maxExtraTiles = -1,
+            Func<TileInfo, Task<IFeature>> fetchTileAsFeature = null)
+            : base(source, minTiles, maxTiles, dataFetchStrategy, renderFetchStrategy, minExtraTiles, maxExtraTiles, fetchTileAsFeature)
+        {
             Name = "TileLayer";
             _slideSource = source;
-            }
+        }
 
         public override IReadOnlyList<double> Resolutions
         {

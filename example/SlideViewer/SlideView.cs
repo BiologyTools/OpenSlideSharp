@@ -6,9 +6,11 @@ using System.Linq;
 using Point = Mapsui.MPoint;
 using System.IO;
 using Mapsui;
-using OpenSlideSharp.BruTile;
-using Mapsui.Rendering.Skia;
 using Mapsui.Extensions;
+using BruTile.Predefined;
+using Mapsui.Tiling.Layers;
+using Mapsui.Tiling.Fetcher;
+using OpenSlideGTK;
 
 namespace SlideLibrary.Demo
 {
@@ -18,10 +20,10 @@ namespace SlideLibrary.Demo
 
         /// <summary> Used to load in the glade file resource as a window. </summary>
         private Builder _builder;
-       
+
 #pragma warning disable 649
         [Builder.Object]
-        private Gtk.DrawingArea pictureBox;
+        private DrawingArea pictureBox;
 #pragma warning restore 649
 
         #endregion
@@ -81,23 +83,22 @@ namespace SlideLibrary.Demo
             | EventMask.PointerMotionMask | EventMask.ScrollMask));
             this.KeyPressEvent += ImageView_KeyPressEvent;
         }
+
         #endregion
 
         private void PictureBox_SizeAllocated(object o, SizeAllocatedArgs args)
         {
             MainMap.Navigator.SetSize(pictureBox.AllocatedWidth,pictureBox.AllocatedHeight);
+            update = true;
         }
-
+        bool update = true;
         private void PictureBox_Drawn(object o, DrawnArgs e)
         {
             Title = MainMap.Navigator.Viewport.ToString();
-            MRect rect = MainMap.Navigator.Viewport.ToExtent();
-            slice.GetFeatures(rect, resolution);
-            Pixbuf pf = slice.buffer;
-            if (pf == null) { Console.WriteLine("No Image"); return; }
-            Gdk.CairoHelper.SetSourcePixbuf(e.Cr,pf, 0, 0);
+            _slideSource.GetSlice(new SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height,resolution));
+            Pixbuf pf = new Pixbuf(OpenSlideBase.LastSlice,false,8,(int)OpenSlideBase.LastExtent.Width, (int)OpenSlideBase.LastExtent.Height, (int)OpenSlideBase.LastExtent.Width * 3);
+            Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
             e.Cr.Paint();
-            pf.Dispose();
         }
         Point pp = new Point(0, 0);
         Point Origin
@@ -105,7 +106,9 @@ namespace SlideLibrary.Demo
             get { return pp; }
             set 
             {
+                MainMap.Navigator.CenterOn(Origin.X, Origin.Y);
                 pp = value;
+                update = true;
                 pictureBox.QueueDraw();
             }
         }
@@ -120,16 +123,16 @@ namespace SlideLibrary.Demo
         /// @return The key that was pressed.
         private void ImageView_KeyPressEvent(object o, KeyPressEventArgs e)
         {
-            double moveAmount = 10*resolution;
+            double moveAmount = 50*resolution;
             keyDown = e.Event.Key;
             //double moveAmount = 5 * Scale.Width;
             if (e.Event.Key == Gdk.Key.e)
             {
-                    Resolution--;
+                    Resolution -= 0.5f;
             }
             if (e.Event.Key == Gdk.Key.q)
             {
-                    Resolution++;
+                    Resolution += 0.5f;
             }
             if (e.Event.Key == Gdk.Key.w)
             {
@@ -147,7 +150,6 @@ namespace SlideLibrary.Demo
             {
                     Origin = new Point(Origin.X + moveAmount, Origin.Y);
             }
-            MainMap.Navigator.CenterOn(Origin.X, Origin.Y);
         }
         /// The function is called when the user presses a key on the keyboard
         /// 
@@ -164,23 +166,26 @@ namespace SlideLibrary.Demo
             if (args.Event.State.HasFlag(ModifierType.ControlMask))
             if (args.Event.Direction == ScrollDirection.Up)
             {
-                    Resolution--;
+                    Resolution -=0.3;
             }
             else
             {
-                    Resolution++;
+                    Resolution += 0.3;
             }
         }
 
         /* Setting the resolution of the image. */
-        double resolution = 10;
+        double resolution = 2;
         public double Resolution
         {
             get { return resolution; }
             set
             {
+                if (value < 0)
+                    return;
                 resolution = value;
                 MainMap.Navigator.ZoomTo(resolution);
+                update = true;
                 pictureBox.QueueDraw();
             }
         }
@@ -193,23 +198,22 @@ namespace SlideLibrary.Demo
                 double x = Origin.X - ((p.X - e.Event.X)*resolution);
                 double y = Origin.Y + ((p.Y - e.Event.Y)*resolution);
                 Origin = new Point(x, y);
-                MainMap.Navigator.CenterOn(Origin.X, Origin.Y);
             }
             p = new Point(e.Event.X, e.Event.Y);
         }
-
+        Point up = new Point(0,0);
         private void ImageView_ButtonReleaseEvent(object o, ButtonReleaseEventArgs e)
         {
-
+            up = new Point(e.Event.X, e.Event.Y);
+            Point p = new Point(up.X - down.X,up.Y - down.Y);
         }
-
+        Point down = new Point(0, 0);
         private void ImageView_ButtonPressEvent(object o, ButtonPressEventArgs e)
         {
-
+            down = new Point(e.Event.X, e.Event.Y);
         }
-        private ISlideSource _slideSource;
-        private SlideTileLayer tile;
-        private SlideSliceLayer slice;
+        private Map MainMap = new Map();
+        private OpenSlideBase _slideSource;
         /// <summary>
         /// Open slide file
         /// </summary>
@@ -217,19 +221,19 @@ namespace SlideLibrary.Demo
         /// <param name="e"></param>
         private void Initialize(string file)
         {
-            MainMap = new Map();
-            MainMap.BackColor = new Mapsui.Styles.Color(0, 0, 0);
+            MainMap.Navigator.CenterOn(0, 0);
+            MainMap.Navigator.ZoomTo(1);
             if (_slideSource != null) (_slideSource as IDisposable).Dispose();
-            _slideSource = SlideSourceBase.Create(file);
+            _slideSource = (OpenSlideBase)SlideSourceBase.Create(file);
             if (_slideSource == null)
             {
                 Console.WriteLine("Failed to load image with OpenSlide.");
                 return;
             }
+            MainMap.Navigator.ZoomToBox(new MRect(0, 0, 256, 256));
             InitMain(_slideSource);
             Console.WriteLine("Initialization Complete.");
         }
-        Map MainMap;
         /// <summary>
         /// Init main map
         /// </summary>
@@ -237,12 +241,10 @@ namespace SlideLibrary.Demo
         private void InitMain(ISlideSource _slideSource)
         {
             MainMap.Layers.Clear();
-            tile = new SlideTileLayer(_slideSource);
-            tile.Enabled = true;
-            slice = new SlideSliceLayer(_slideSource);
-            MainMap.Layers.Add(tile);
-            MainMap.Layers.Add(slice);
-            Resolution = 1;
+            MainMap.Layers.Clear();
+            MainMap.Layers.Add(new SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
+            //MainMap.Layers.Add(new SlideSliceLayer(_slideSource) { Enabled = false, Opacity = 0.5 });
+            //MainMap.Layers.Add(slice);
         }
 
     }
