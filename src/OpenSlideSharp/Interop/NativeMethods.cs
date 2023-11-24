@@ -819,7 +819,7 @@ namespace OpenSlideGTK.Interop
             /// <summary>
             /// library name
             /// </summary>
-            public const string LibraryName = "libopenslide-1";
+            public const string LibraryName = "libopenslide-0";
             //public const string LibraryName = "libopenslide.0.dylib";
             //public const string LibraryName = "libopenslide.so.1";
             /// <summary>

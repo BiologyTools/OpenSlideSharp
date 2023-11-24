@@ -2,8 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AForge;
-using AForge.Imaging.Filters;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace OpenSlideGTK
 {
@@ -91,10 +92,6 @@ namespace OpenSlideGTK
             }
         }
         */
-        static Bitmap canvas = new Bitmap(0, 0, PixelFormat.Format24bppRgb);
-        static Bitmap region = new Bitmap(0, 0, PixelFormat.Format24bppRgb);
-        static int canvasWidth, canvasHeight, interWidth, interHeight;
-        static ResizeNearestNeighbor rs;
         /// <summary>
         /// Join by <paramref name="srcPixelTiles"/> and cut by <paramref name="srcPixelExtent"/> then scale to <paramref name="dstPixelExtent"/>(only height an width is useful).
         /// </summary>
@@ -102,57 +99,61 @@ namespace OpenSlideGTK
         /// <param name="srcPixelExtent">canvas extent</param>
         /// <param name="dstPixelExtent">jpeg output size</param>
         /// <returns></returns>
-        public static Bitmap Join(IEnumerable<Tuple<Extent, byte[]>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
+        public static Image<Rgb24> Join(IEnumerable<Tuple<Extent, Image<Rgb24>>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
         {
             if (srcPixelTiles == null || srcPixelTiles.Count() == 0)
                 return null;
             srcPixelExtent = srcPixelExtent.ToIntegerExtent();
             dstPixelExtent = dstPixelExtent.ToIntegerExtent();
-            canvasWidth = (int)srcPixelExtent.Width;
-            canvasHeight = (int)srcPixelExtent.Height;
+            int canvasWidth = (int)srcPixelExtent.Width;
+            int canvasHeight = (int)srcPixelExtent.Height;
             var dstWidth = (int)dstPixelExtent.Width;
             var dstHeight = (int)dstPixelExtent.Height;
-            if (canvas.Width != canvasWidth || canvas.Height != canvasHeight)
-            {
-                canvas = new Bitmap(canvasWidth, canvasHeight, PixelFormat.Format24bppRgb);
-                rs = new ResizeNearestNeighbor(dstWidth, dstHeight);
-            }
+            Image<Rgb24> canvas = new Image<Rgb24>(canvasWidth, canvasHeight);
             foreach (var tile in srcPixelTiles)
             {
                 var tileExtent = tile.Item1.ToIntegerExtent();
-                Bitmap tileRawData = new Bitmap(256,256,PixelFormat.Format32bppArgb,tile.Item2,new ZCT(),"");
+                Image<Rgb24> tileRawData = tile.Item2;
                 var intersect = srcPixelExtent.Intersect(tileExtent);
                 var tileOffsetPixelX = (int)(intersect.MinX - tileExtent.MinX);
                 var tileOffsetPixelY = (int)(intersect.MinY - tileExtent.MinY);
                 var canvasOffsetPixelX = (int)(intersect.MinX - srcPixelExtent.MinX);
                 var canvasOffsetPixelY = (int)(intersect.MinY - srcPixelExtent.MinY);
-                //First we copy the correct portion of the tiledata to a new Bitmap.
-                Bitmap im = new Bitmap((int)intersect.Width, (int)intersect.Height, PixelFormat.Format24bppRgb);
-                for (int y = 0; y < im.Height; y++)
+                try
                 {
-                    for (int x = 0; x < im.Width; x++)
+                    //First we copy the correct portion of the tiledata to a new Bitmap.
+                    Image<Rgb24> im = new Image<Rgb24>((int)intersect.Width, (int)intersect.Height);
+                    for (int y = 0; y < im.Height; y++)
                     {
-                        int indx = tileOffsetPixelX + x;
-                        int indy = tileOffsetPixelY + y;
-                        im.SetPixel(x, y, tileRawData.GetPixel(indx, indy));
+                        for (int x = 0; x < im.Width; x++)
+                        {
+                            int indx = tileOffsetPixelX + x;
+                            int indy = tileOffsetPixelY + y;
+                            im[x, y] = tileRawData[indx, indy];
+                        }
+                    }
+                    //Next we copy the tile region to the canvas.
+                    for (int y = 0; y < im.Height; y++)
+                    {
+                        for (int x = 0; x < im.Width; x++)
+                        {
+                            int indx = canvasOffsetPixelX + x;
+                            int indy = canvasOffsetPixelY + y;
+                            canvas[indx, indy] = im[x, y];
+                        }
                     }
                 }
-                //Next we copy the tile region to the canvas.
-                for (int y = 0; y < im.Height; y++)
+                catch (Exception e)
                 {
-                    for (int x = 0; x < im.Width; x++)
-                    {
-                        int indx = canvasOffsetPixelX + x;
-                        int indy = canvasOffsetPixelY + y;
-                        canvas.SetPixel(indx, indy, im.GetPixel(x, y));
-                    }
+                    Console.WriteLine(e.Message);
                 }
             }
             if (dstWidth != canvasWidth || dstHeight != canvasHeight)
             {
                 try
                 {
-                    return rs.Apply(canvas);
+                    canvas.Mutate(x => x.Resize(dstWidth, dstHeight));
+                    return canvas;
                 }
                 catch (Exception e)
                 {

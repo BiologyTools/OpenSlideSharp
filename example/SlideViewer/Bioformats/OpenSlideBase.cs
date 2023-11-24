@@ -4,29 +4,31 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenSlideGTK;
+using BioGTK;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace OpenSlideGTK
+namespace SlideViewer
 {
     public class OpenSlideBase : SlideSourceBase
     {
-        public readonly OpenSlideImage SlideImage;
+        //public readonly OpenSlideImage SlideImage;
         private readonly bool _enableCache;
         private readonly MemoryCache<Image> _tileCache = new MemoryCache<Image>();
-
+        private BioImage image;
         public OpenSlideBase(string source, bool enableCache = true)
         {
             Source = source;
             _enableCache = enableCache;
-            SlideImage = OpenSlideImage.Open(source);
-            var minUnitsPerPixel = SlideImage.MicronsPerPixelX ?? SlideImage.MicronsPerPixelY ?? 1;
+            image = BioImage.OpenFile(source);
+            double minUnitsPerPixel;
+            if (image.PhysicalSizeX < image.PhysicalSizeY) minUnitsPerPixel = image.PhysicalSizeX; else minUnitsPerPixel = image.PhysicalSizeY;
             MinUnitsPerPixel = UseRealResolution ? minUnitsPerPixel : 1;
             if (MinUnitsPerPixel <= 0) MinUnitsPerPixel = 1;
-            var height = SlideImage.Dimensions.Height * MinUnitsPerPixel;
-            var width = SlideImage.Dimensions.Width * MinUnitsPerPixel;
-            ExternInfo = GetInfo();
+            var height = image.Resolutions[0].SizeY * MinUnitsPerPixel;
+            var width = image.Resolutions[0].SizeX * MinUnitsPerPixel;
+            //ExternInfo = GetInfo();
             Schema = new TileSchema
             {
                 YAxis = YAxis.OSM,
@@ -92,11 +94,17 @@ namespace OpenSlideGTK
             var curLevelOffsetYPixel = -tileInfo.Extent.MaxY / MinUnitsPerPixel;
             var curTileWidth = (int)(tileInfo.Extent.MaxX > Schema.Extent.Width ? tileWidth - (tileInfo.Extent.MaxX - Schema.Extent.Width) / r : tileWidth);
             var curTileHeight = (int)(-tileInfo.Extent.MinY > Schema.Extent.Height ? tileHeight - (-tileInfo.Extent.MinY - Schema.Extent.Height) / r : tileHeight);
-            var bgraData = SlideImage.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, curTileWidth, curTileHeight);
-            //We check to see if the data is valid.
-            if (bgraData.Length != curTileWidth * curTileHeight * 4)
-                return null;
-            Image<Rgb24> bm = CreateImageFromRgbaData(bgraData, curTileWidth, curTileHeight);
+            byte[] bgraData;
+            try
+            {
+                //bgraData = BioImage.OpenOME(image.file, tileInfo.Index.Level,false,false,true,(int)curLevelOffsetXPixel,(int)curLevelOffsetYPixel,curTileWidth,curTileHeight).Buffers[0].RGBBytes;
+                bgraData = BioImage.GetTile(image, new AForge.ZCT(), tileInfo.Index.Level, (int)curLevelOffsetXPixel, (int)curLevelOffsetYPixel, curTileWidth, curTileHeight).RGBBytes;
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+            Image<Rgb24> bm = CreateImageFromRgbaData(bgraData,curTileWidth,curTileHeight);
             if (_enableCache && bgraData != null)
                 _tileCache.Add(tileInfo.Index, bm);
             return bm;
@@ -104,9 +112,9 @@ namespace OpenSlideGTK
 
         public override async Task<byte[]> GetTileAsync(TileInfo tileInfo)
         {
-            throw new NotImplementedException();
+            return null;
         }
-
+        /*
         protected IReadOnlyDictionary<string, object> GetInfo()
         {
             Dictionary<string, object> keys = SlideImage.GetFieldsProperties().ToDictionary(_ => _.Key, _ => _.Value);
@@ -116,18 +124,19 @@ namespace OpenSlideGTK
             }
             return keys;
         }
-
-        protected void InitResolutions(IDictionary<int, Resolution> resolutions, int tileWidth, int tileHeight)
+        */
+        protected void InitResolutions(IDictionary<int, BruTile.Resolution> resolutions, int tileWidth, int tileHeight)
         {
-            for (int i = 0; i < SlideImage.LevelCount; i++)
+            for (int i = 0; i < image.Resolutions.Count; i++)
             {
+                /*
                 bool useInternalWidth = int.TryParse(ExternInfo.TryGetValue($"openslide.level[{i}].tile-width", out var _w) ? (string)_w : null, out var w) && w >= tileWidth;
                 bool useInternalHeight = int.TryParse(ExternInfo.TryGetValue($"openslide.level[{i}].tile-height", out var _h) ? (string)_h : null, out var h) && h >= tileHeight;
 
                 bool useInternalSize = useInternalHeight && useInternalWidth;
-                var tw = useInternalSize ? w : tileWidth;
-                var th = useInternalSize ? h : tileHeight;
-                resolutions.Add(i, new Resolution(i, MinUnitsPerPixel * SlideImage.GetLevelDownsample(i), tw, th));
+                */
+                //resolutions.Add(i, new BruTile.Resolution(i, MinUnitsPerPixel * SlideImage.GetLevelDownsample(i), tw, th));
+                resolutions.Add(i, new BruTile.Resolution(i, MinUnitsPerPixel * i, 256, 256));
             }
         }
 
@@ -139,7 +148,7 @@ namespace OpenSlideGTK
             {
                 if (disposing)
                 {
-                    SlideImage.Dispose();
+                    image.Dispose();
                 }
                 disposedValue = true;
             }

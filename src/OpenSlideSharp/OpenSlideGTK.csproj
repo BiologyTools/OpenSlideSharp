@@ -4,10 +4,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
-    <PackageTags>OpenSlide; GTK; </PackageTags>
-    <PackageReleaseNotes>Cross platform Windows, Linux &amp; Mac .NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</PackageReleaseNotes>
-    <Description>.NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>1.1.0</Version>
+    <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
+    <PackageReleaseNotes>Bugfixes and added ImageSharp.</PackageReleaseNotes>
+    <Description>Cross platform Windows, Linux &amp; Mac .NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
+    <Version>1.2.0</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -28,10 +28,10 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="1.4.3" />
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
     <PackageReference Include="Mapsui.Tiling" Version="4.1.1" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
   </ItemGroup>
   
 </Project>

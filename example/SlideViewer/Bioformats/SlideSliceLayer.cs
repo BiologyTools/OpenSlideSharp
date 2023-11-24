@@ -5,6 +5,7 @@ using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Styles;
 using Mapsui.Tiling.Extensions;
+using OpenSlideGTK;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
@@ -12,7 +13,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace OpenSlideGTK
+namespace SlideViewer
 {
     /// <summary>
     /// Slide slice layer

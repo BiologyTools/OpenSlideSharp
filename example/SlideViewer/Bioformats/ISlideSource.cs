@@ -5,19 +5,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
+using BioGTK;
+using OpenSlideGTK;
+using AForge;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
 
-namespace OpenSlideGTK
+namespace SlideViewer
 {
 
     public abstract class SlideSourceBase : ISlideSource, IDisposable
     {
         #region Static
         public static bool UseRealResolution { get; set; } = true;
-
         private static IDictionary<string, Func<string, bool, ISlideSource>> keyValuePairs = new Dictionary<string, Func<string, bool, ISlideSource>>();
-
         /// <summary>
         /// resister decode for Specific format
         /// </summary>
@@ -35,13 +36,11 @@ namespace OpenSlideGTK
             {
                 if (keyValuePairs.TryGetValue(ext, out var factory) && factory != null)
                     return factory.Invoke(source, enableCache);
-
-                if (!string.IsNullOrEmpty(OpenSlideBase.DetectVendor(source)))
-                    return new OpenSlideBase(source, enableCache);
+                return new OpenSlideBase(source, enableCache);
             }
             catch (Exception e) 
-            { 
-                Console.WriteLine(e.Message); 
+            {
+                Console.WriteLine(e.Message);
             }
             return null;
         }
@@ -58,34 +57,31 @@ namespace OpenSlideGTK
         public static Extent LastExtent;
         public virtual Image<Rgb24> GetSlice(SliceInfo sliceInfo)
         {
-            var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, sliceInfo.Parame.SampleMode);
-            var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
-            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
+            if (sliceInfo.Extent.Intersects(Schema.Extent) && sliceInfo.Resolution != 0)
+            {
+                var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, (OpenSlideGTK.SampleMode)sliceInfo.Parame.SampleMode);
+                var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
+                var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
 
-            Func<TileInfo, Image<Rgb24>> getOrInsterCache = new Func<TileInfo, Image<Rgb24>>(_ =>
-            {
-                var cache = _bgraCache.Find(_.Index);
-                if (cache == null)
-                {
-                    cache = GetTile(_);
-                    _bgraCache.Add(_.Index, cache);
-                }
-                return cache;
-            });
-            var tiles = tileInfos.Select(_ => Tuple.Create(_.Extent.WorldToPixelInvertedY(curUnitsPerPixel), getOrInsterCache.Invoke(_))); var srcPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
-            var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
-            var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
-            var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
-            try
-            {
+                Func<TileInfo, Image<Rgb24>> getOrInsterCache = new Func<TileInfo, Image<Rgb24>>(_ =>
+                 {
+                     var cache = _bgraCache.Find(_.Index);
+                     if (cache == null)
+                     {
+                         cache = GetTile(_);
+                         _bgraCache.Add(_.Index, cache);
+                     }
+                     return cache;
+                 });
+                var tiles = tileInfos.Select(_ => Tuple.Create(_.Extent.WorldToPixelInvertedY(curUnitsPerPixel), getOrInsterCache.Invoke(_))); var srcPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+                var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
+                var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
+                var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
                 LastSlice = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
                 LastExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
+                return LastSlice;
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            return LastSlice;
+            return null;
         }
 
         public ITileSchema Schema { get; protected set; }

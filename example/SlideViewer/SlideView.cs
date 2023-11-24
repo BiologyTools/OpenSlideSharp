@@ -11,6 +11,11 @@ using BruTile.Predefined;
 using Mapsui.Tiling.Layers;
 using Mapsui.Tiling.Fetcher;
 using OpenSlideGTK;
+using BioGTK;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
+
 namespace SlideViewer
 {
     public class SlideView : Gtk.Window
@@ -31,12 +36,14 @@ namespace SlideViewer
 
         public static SlideView Create(string file)
         {
+            BioImage.Initialize();
             Builder builder = new Builder(new FileStream(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/" + "Glade/SlideView.glade", FileMode.Open));
             SlideView v = new SlideView(builder, builder.GetObject("slideView").Handle,file);
             return v;
         }
         public static SlideView Create()
         {
+            BioImage.Initialize();
             Builder builder = new Builder(new FileStream(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/" + "Glade/SlideView.glade", FileMode.Open));
             SlideView v = new SlideView(builder, builder.GetObject("slideView").Handle, "");
             return v;
@@ -88,15 +95,42 @@ namespace SlideViewer
         private void PictureBox_SizeAllocated(object o, SizeAllocatedArgs args)
         {
             MainMap.Navigator.SetSize(pictureBox.AllocatedWidth,pictureBox.AllocatedHeight);
-            update = true;
         }
-        bool update = true;
+        static byte[] ImageToByteArray(Image<Rgb24> image)
+        {
+            using (MemoryStream memoryStream = new MemoryStream())
+            {
+                // Save the image to the MemoryStream using PNG format
+                // You can change the format to JPEG or any other supported format
+                image.Save(memoryStream, new PngEncoder());
+                return memoryStream.ToArray();
+            }
+        }
         private void PictureBox_Drawn(object o, DrawnArgs e)
         {
             Title = MainMap.Navigator.Viewport.ToString();
-            _slideSource.GetSlice(new SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height,resolution));
-            Pixbuf pf = new Pixbuf(OpenSlideBase.LastSlice,false,8,(int)OpenSlideBase.LastExtent.Width, (int)OpenSlideBase.LastExtent.Height, (int)OpenSlideBase.LastExtent.Width * 3);
-            Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
+            try
+            {
+                if (!openSlide)
+                {
+                    _slideSource.GetSlice(new SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
+                    byte[] bts = ImageToByteArray(OpenSlideBase.LastSlice);
+                    Pixbuf pf = new Pixbuf(bts);
+                    Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
+                }
+                else
+                {
+                    _openSlideBase.GetSlice(new OpenSlideGTK.SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
+                    byte[] bts = ImageToByteArray(OpenSlideGTK.OpenSlideBase.LastSlice);
+                    Pixbuf pf = new Pixbuf(bts);
+                    Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
+                }
+            }
+            catch (Exception er)
+            {
+                Console.WriteLine(er.Message);
+            }
+            
             e.Cr.Paint();
         }
         Point pp = new Point(0, 0);
@@ -107,7 +141,6 @@ namespace SlideViewer
             {
                 MainMap.Navigator.CenterOn(Origin.X, Origin.Y);
                 pp = value;
-                update = true;
                 pictureBox.QueueDraw();
             }
         }
@@ -174,7 +207,7 @@ namespace SlideViewer
         }
 
         /* Setting the resolution of the image. */
-        double resolution = 2;
+        double resolution = 1;
         public double Resolution
         {
             get { return resolution; }
@@ -184,7 +217,6 @@ namespace SlideViewer
                     return;
                 resolution = value;
                 MainMap.Navigator.ZoomTo(resolution);
-                update = true;
                 pictureBox.QueueDraw();
             }
         }
@@ -213,6 +245,8 @@ namespace SlideViewer
         }
         private Map MainMap = new Map();
         private OpenSlideBase _slideSource;
+        private OpenSlideGTK.OpenSlideBase _openSlideBase;
+        private bool openSlide = false;
         /// <summary>
         /// Open slide file
         /// </summary>
@@ -221,27 +255,53 @@ namespace SlideViewer
         private void Initialize(string file)
         {
             MainMap.Navigator.CenterOn(0, 0);
-            MainMap.Navigator.ZoomTo(1);
-            if (_slideSource != null) (_slideSource as IDisposable).Dispose();
-            _slideSource = (OpenSlideBase)SlideSourceBase.Create(file);
-            if (_slideSource == null)
+
+            if (_openSlideBase != null) (_openSlideBase as IDisposable).Dispose();
+            _openSlideBase = (OpenSlideGTK.OpenSlideBase)OpenSlideGTK.SlideSourceBase.Create(file);
+            if (_openSlideBase == null)
             {
+                openSlide = false;
                 Console.WriteLine("Failed to load image with OpenSlide.");
-                return;
+                if (_slideSource != null) (_slideSource as IDisposable).Dispose();
+                _slideSource = (OpenSlideBase)SlideSourceBase.Create(file);
+                if (_slideSource == null)
+                {
+                    Console.WriteLine("Failed to load image with Bioformats.");
+                    return;
+                }
+                MainMap.Navigator.ZoomToBox(new MRect(0, 0, 256, 256));
+                InitMainBioformats(_slideSource);
             }
-            MainMap.Navigator.ZoomToBox(new MRect(0, 0, 256, 256));
-            InitMain(_slideSource);
+            else
+            {
+                openSlide = true;
+                MainMap.Navigator.SetViewport(new Mapsui.Viewport(0, 0, resolution, 0, 256, 256));
+                //MainMap.Navigator.Limiter.Limit(MainMap.Navigator.Viewport,new MRect(-_openSlideBase.SlideImage.Dimensions.Width, -_openSlideBase.SlideImage.Dimensions.Height, _openSlideBase.SlideImage.Dimensions.Width, _openSlideBase.SlideImage.Dimensions.Height), null);
+                //MainMap.Navigator.ZoomToBox(new MRect(0, 0, _openSlideBase.SlideImage.Dimensions.Width, _openSlideBase.SlideImage.Dimensions.Height));
+                InitMainOpenSlide(_openSlideBase);
+            }
             Console.WriteLine("Initialization Complete.");
         }
         /// <summary>
         /// Init main map
         /// </summary>
         /// <param name="_slideSource"></param>
-        private void InitMain(ISlideSource _slideSource)
+        private void InitMainBioformats(ISlideSource _slideSource)
         {
             MainMap.Layers.Clear();
+            MainMap.Layers.Add(new SlideViewer.SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
+            //MainMap.Layers.Add(new SlideSliceLayer(_slideSource) { Enabled = false, Opacity = 0.5 });
+            //MainMap.Layers.Add(slice);
+        }
+
+        /// <summary>
+        /// Init main map
+        /// </summary>
+        /// <param name="_slideSource"></param>
+        private void InitMainOpenSlide(OpenSlideGTK.ISlideSource _slideSource)
+        {
             MainMap.Layers.Clear();
-            MainMap.Layers.Add(new SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
+            MainMap.Layers.Add(new OpenSlideGTK.SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
             //MainMap.Layers.Add(new SlideSliceLayer(_slideSource) { Enabled = false, Opacity = 0.5 });
             //MainMap.Layers.Add(slice);
         }

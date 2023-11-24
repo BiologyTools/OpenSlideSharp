@@ -6,6 +6,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.1.1</Version>
     <StartupObject>SlideViewer.Program</StartupObject>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="1.4.3" />
+    <PackageReference Include="BioLib" Version="1.7.0" />
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="GtkSharp" Version="3.24.24.95" />
     <PackageReference Include="Mapsui" Version="4.1.1" />
@@ -26,9 +27,25 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenSlideSharp\OpenSlideGTK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="C:\Users\Erikr\.nuget\packages\bioformats.net6\7.0.1\contentFiles\any\net6.0\bioformats_package.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="C:\Users\Erikr\.nuget\packages\biolib\1.7.0\contentFiles\any\net6.0\bioformats_package.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Reference Include="bioformats_package">
+      <HintPath>bioformats_package.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
