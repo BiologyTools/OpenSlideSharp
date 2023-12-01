@@ -1,7 +1,7 @@
 
 ![openslide](./openslide_logo.png)
 
-[![NuGet version (OpenSlideGTK)](https://img.shields.io/nuget/v/OpenSlideGTK.svg?style=flat-square)](https://www.nuget.org/packages/OpenSlideGTK/1.2.0)
+[![NuGet version (OpenSlideGTK)](https://img.shields.io/nuget/v/OpenSlideGTK.svg?style=flat-square)](https://www.nuget.org/packages/OpenSlideGTK/1.3.0)
 
 # OpenSlideGTK
 .NET6 cross-platform Windows, Linux, Mac, bindings for OpenSlide (http://openslide.org/). As well as cross platform .NET6 slide viewer.  
@@ -12,7 +12,7 @@ Thank you to @yigolden for his work on [OpenSlideNET](https://github.com/yigolde
 
 Nuget    
 ```ps
-Install-Package OpenSlideGTK -Version 1.2.0
+Install-Package OpenSlideGTK -Version 1.3.0
 ```
 
 ## Index

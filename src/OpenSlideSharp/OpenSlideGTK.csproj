@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>NetVips integration for fast stiching.</PackageReleaseNotes>
+    <PackageReleaseNotes>NetVips integration for fast stitching.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
     <Version>1.3.0</Version>
     <Title>OpenSlideGTK</Title>
