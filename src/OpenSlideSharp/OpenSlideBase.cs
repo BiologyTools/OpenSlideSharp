@@ -14,7 +14,7 @@ namespace OpenSlideGTK
     {
         public readonly OpenSlideImage SlideImage;
         private readonly bool _enableCache;
-        private readonly MemoryCache<Image> _tileCache = new MemoryCache<Image>();
+        private readonly MemoryCache<byte[]> _tileCache = new MemoryCache<byte[]>();
 
         public OpenSlideBase(string source, bool enableCache = true)
         {
@@ -24,8 +24,8 @@ namespace OpenSlideGTK
             var minUnitsPerPixel = SlideImage.MicronsPerPixelX ?? SlideImage.MicronsPerPixelY ?? 1;
             MinUnitsPerPixel = UseRealResolution ? minUnitsPerPixel : 1;
             if (MinUnitsPerPixel <= 0) MinUnitsPerPixel = 1;
-            var height = SlideImage.Dimensions.Height * MinUnitsPerPixel;
-            var width = SlideImage.Dimensions.Width * MinUnitsPerPixel;
+            var height = SlideImage.Dimensions.Height;
+            var width = SlideImage.Dimensions.Width;
             ExternInfo = GetInfo();
             Schema = new TileSchema
             {
@@ -79,11 +79,11 @@ namespace OpenSlideGTK
 
             return image;
         }
-        public override Image<Rgb24> GetTile(TileInfo tileInfo)
+        public override byte[] GetTile(TileInfo tileInfo)
         {
             if (tileInfo == null)
                 return null;
-            if (_enableCache && _tileCache.Find(tileInfo.Index) is Image<Rgb24> output)
+            if (_enableCache && _tileCache.Find(tileInfo.Index) is byte[] output)
                 return output;
             var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
@@ -96,10 +96,25 @@ namespace OpenSlideGTK
             //We check to see if the data is valid.
             if (bgraData.Length != curTileWidth * curTileHeight * 4)
                 return null;
-            Image<Rgb24> bm = CreateImageFromRgbaData(bgraData, curTileWidth, curTileHeight);
+            byte[] bm = ConvertRgbaToRgb(bgraData);
             if (_enableCache && bgraData != null)
                 _tileCache.Add(tileInfo.Index, bm);
             return bm;
+        }
+        public static byte[] ConvertRgbaToRgb(byte[] rgbaArray)
+        {
+            // Initialize a new byte array for RGB24 format
+            byte[] rgbArray = new byte[(rgbaArray.Length / 4) * 3];
+
+            for (int i = 0, j = 0; i < rgbaArray.Length; i += 4, j += 3)
+            {
+                // Copy the R, G, B values, skip the A value
+                rgbArray[j] = rgbaArray[i];     // R
+                rgbArray[j + 1] = rgbaArray[i + 1]; // G
+                rgbArray[j + 2] = rgbaArray[i + 2]; // B
+            }
+
+            return rgbArray;
         }
 
         public override async Task<byte[]> GetTileAsync(TileInfo tileInfo)

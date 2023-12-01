@@ -5,93 +5,17 @@ using System.Linq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using System.IO;
+using NetVips;
+using static System.Net.Mime.MediaTypeNames;
+using System.Runtime.InteropServices;
+using System.Reflection;
+using static System.Net.WebRequestMethods;
 
 namespace OpenSlideGTK
 {
     public class ImageUtil
     {
-        /*
-        /// <summary>
-        /// BGR/BGRA convert to jpeg
-        /// </summary>
-        /// <param name="bgraBytes">BGR/BGRA</param>
-        /// <param name="bytesPerPixel">bytes per pixel</param>
-        /// <param name="bytesPerLine">bytes per line</param>
-        /// <param name="width">width</param>
-        /// <param name="height">height</param>
-        /// <param name="dstWidth">dst width</param>
-        /// <param name="dstHeight">dst height</param>
-        /// <param name="quality">jpeg quality</param>
-        /// <param name="background">background color for transparent if <paramref name="bytesPerPixel"/> == 4</param>
-        /// <returns></returns>
-        public static unsafe byte[] GetJpeg(byte[] bgraBytes, int bytesPerPixel, int bytesPerLine, int width, int height, int dstWidth = 0, int dstHeight = 0, int? quality = null, uint background = 0xFFFFFFFF)
-        {
-            if (bgraBytes == null) return null;
-            if (bytesPerPixel != 3 && bytesPerPixel != 4) throw new ArgumentException(nameof(bytesPerPixel));
-            var prms = quality != null ? new int[] { (int)ImwriteFlags.JpegQuality, quality.Value } : null;
-            var pixel = MatType.CV_8UC(bytesPerPixel);
-            fixed (byte* scan0 = bgraBytes)
-            {
-                using (var src = new Mat(height, width, pixel, (IntPtr)scan0, bytesPerLine))
-                {
-                    // black transparent to background
-                    if (pixel.Channels == 4)
-                    {
-                        unchecked
-                        {
-                            src.ForEachAsInt32((_i, _p) =>
-                            {
-                                if ((*_i & 0xFF000000) != 0xFF000000) *_i = (Int32)(background); // alpha is not 0xff
-                            });
-                        }
-                    }
-                    if ((dstWidth <= 0 && dstHeight <= 0) || (dstWidth == width && dstHeight == height))
-                    {
-                        return src.ToBytes(".jpg", prms);
-                    }
-                    else  // fill 
-                    {
-                        var scalar = new Scalar((int)(background >> 24 & 0xFF), (int)(background >> 16 & 0xFF), (int)(background >> 8 & 0xFF), (int)(background & 0xFF));
-                        using (var dst = new Mat(dstHeight, dstWidth, pixel, scalar))
-                        {
-                            DrawImage(src, dst);
-                            return dst.ToBytes(".jpg", prms);
-                        }
-                    }
-                }
-            }
-        }
-        */
-        /*
-        /// <summary>
-        /// Fill the source image with adaptive scaling to the target image
-        /// </summary>
-        /// <param name="src"></param>
-        /// <param name="dst"></param>
-        private static void DrawImage(Mat src, Mat dst)
-        {
-            var fx = (double)dst.Width / src.Width;
-            var fy = (double)dst.Height / src.Height;
-            var fmin = Math.Min(fx, fy);
-            if (fmin < 1) // src > dst
-            {
-                using (var srcResized = src.Resize(new AForge.Size((int)(src.Width * fmin), (int)(src.Height * fmin))))
-                {
-                    using (var sub = new Mat(dst, new Rect(0, 0, srcResized.Width, srcResized.Height)))
-                    {
-                        srcResized.CopyTo(sub);
-                    }
-                }
-            }
-            else // src <= dst
-            {
-                using (var sub = new Mat(dst, new Rect(0, 0, src.Width, src.Height)))
-                {
-                    src.CopyTo(sub);
-                }
-            }
-        }
-        */
         /// <summary>
         /// Join by <paramref name="srcPixelTiles"/> and cut by <paramref name="srcPixelExtent"/> then scale to <paramref name="dstPixelExtent"/>(only height an width is useful).
         /// </summary>
@@ -99,47 +23,40 @@ namespace OpenSlideGTK
         /// <param name="srcPixelExtent">canvas extent</param>
         /// <param name="dstPixelExtent">jpeg output size</param>
         /// <returns></returns>
-        public static Image<Rgb24> Join(IEnumerable<Tuple<Extent, Image<Rgb24>>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
+        public static Image<Rgb24> Join(IEnumerable<Tuple<Extent, byte[]>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
         {
             if (srcPixelTiles == null || srcPixelTiles.Count() == 0)
                 return null;
             srcPixelExtent = srcPixelExtent.ToIntegerExtent();
             dstPixelExtent = dstPixelExtent.ToIntegerExtent();
-            int canvasWidth = (int)srcPixelExtent.Width;
-            int canvasHeight = (int)srcPixelExtent.Height;
-            var dstWidth = (int)dstPixelExtent.Width;
-            var dstHeight = (int)dstPixelExtent.Height;
+            int canvasWidth = (int)Math.Ceiling(srcPixelExtent.Width);
+            int canvasHeight = (int)Math.Ceiling(srcPixelExtent.Height);
+            var dstWidth = (int)Math.Ceiling(dstPixelExtent.Width);
+            var dstHeight = (int)Math.Ceiling(dstPixelExtent.Height);
             Image<Rgb24> canvas = new Image<Rgb24>(canvasWidth, canvasHeight);
             foreach (var tile in srcPixelTiles)
             {
                 var tileExtent = tile.Item1.ToIntegerExtent();
-                Image<Rgb24> tileRawData = tile.Item2;
+                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)Math.Ceiling(tileExtent.Width), (int)Math.Ceiling(tileExtent.Height));
                 var intersect = srcPixelExtent.Intersect(tileExtent);
-                var tileOffsetPixelX = (int)(intersect.MinX - tileExtent.MinX);
-                var tileOffsetPixelY = (int)(intersect.MinY - tileExtent.MinY);
-                var canvasOffsetPixelX = (int)(intersect.MinX - srcPixelExtent.MinX);
-                var canvasOffsetPixelY = (int)(intersect.MinY - srcPixelExtent.MinY);
+                var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
+                var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
+                var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
+                var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
+                if (intersect.Width == 0 || intersect.Height == 0)
+                    continue;
                 try
                 {
-                    //First we copy the correct portion of the tiledata to a new Bitmap.
-                    Image<Rgb24> im = new Image<Rgb24>((int)intersect.Width, (int)intersect.Height);
-                    for (int y = 0; y < im.Height; y++)
+                    //We copy the tile region to the canvas.
+                    for (int y = 0; y < intersect.Height; y++)
                     {
-                        for (int x = 0; x < im.Width; x++)
-                        {
-                            int indx = tileOffsetPixelX + x;
-                            int indy = tileOffsetPixelY + y;
-                            im[x, y] = tileRawData[indx, indy];
-                        }
-                    }
-                    //Next we copy the tile region to the canvas.
-                    for (int y = 0; y < im.Height; y++)
-                    {
-                        for (int x = 0; x < im.Width; x++)
+                        for (int x = 0; x < intersect.Width; x++)
                         {
                             int indx = canvasOffsetPixelX + x;
                             int indy = canvasOffsetPixelY + y;
-                            canvas[indx, indy] = im[x, y];
+                            int tindx = tileOffsetPixelX + x;
+                            int tindy = tileOffsetPixelY + y;
+                            canvas[indx, indy] = tileRawData[tindx, tindy];
                         }
                     }
                 }
@@ -147,6 +64,7 @@ namespace OpenSlideGTK
                 {
                     Console.WriteLine(e.Message);
                 }
+                tileRawData.Dispose();
             }
             if (dstWidth != canvasWidth || dstHeight != canvasHeight)
             {
@@ -163,7 +81,107 @@ namespace OpenSlideGTK
             }
             return canvas;
         }
+
+        /// <summary>
+        /// Join by <paramref name="srcPixelTiles"/> and cut by <paramref name="srcPixelExtent"/> then scale to <paramref name="dstPixelExtent"/>(only height an width is useful).
+        /// </summary>
+        /// <param name="srcPixelTiles">tile with tile extent collection</param>
+        /// <param name="srcPixelExtent">canvas extent</param>
+        /// <param name="dstPixelExtent">jpeg output size</param>
+        /// <returns></returns>
+        public static unsafe NetVips.Image JoinVips(IEnumerable<Tuple<Extent, byte[]>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
+        {
+            NetVips.Image canvas = null;
+            
+            if (srcPixelTiles == null || srcPixelTiles.Count() == 0)
+                return null;
+            srcPixelExtent = srcPixelExtent.ToIntegerExtent();
+            dstPixelExtent = dstPixelExtent.ToIntegerExtent();
+            int canvasWidth = (int)Math.Ceiling(srcPixelExtent.Width);
+            int canvasHeight = (int)Math.Ceiling(srcPixelExtent.Height);
+            int dstWidth = (int)Math.Ceiling(dstPixelExtent.Width);
+            int dstHeight = (int)Math.Ceiling(dstPixelExtent.Height);
+            byte[] bts = new byte[canvasWidth * 3 * canvasHeight];
+            int i = 0;
+            int tls = srcPixelTiles.Count();
+            try
+            {
+                fixed (byte* dat = bts)
+                {
+                    canvas = NetVips.Image.NewFromMemory((IntPtr)dat, (ulong)bts.Length, canvasWidth, canvasHeight, 3, Enums.BandFormat.Uchar);
+                }
+                foreach (var tile in srcPixelTiles)
+                {
+                    var tileExtent = tile.Item1.ToIntegerExtent();
+                    fixed (byte* dat = tile.Item2)
+                    {
+                        NetVips.Image im = NetVips.Image.NewFromMemory((IntPtr)dat,(ulong)tile.Item2.Length, (int)Math.Ceiling(tileExtent.Width), (int)Math.Ceiling(tileExtent.Height), 3, Enums.BandFormat.Uchar);
+                        var intersect = srcPixelExtent.Intersect(tileExtent);
+                        var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
+                        var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
+                        var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
+                        var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
+                        if (intersect.Width == 0 || intersect.Height == 0)
+                            continue;
+                        NetVips.Image t = im.Crop(tileOffsetPixelX, tileOffsetPixelY,(int)Math.Ceiling(intersect.Width),(int)Math.Ceiling(intersect.Height));
+                        canvas = canvas.Insert(t,canvasOffsetPixelX, canvasOffsetPixelY);
+                        t.Dispose();
+                        i++;
+                    }
+                }
+                if (dstWidth != canvasWidth || dstHeight != canvasHeight)
+                {
+                    // Calculate scaling factors for width and height
+                    double scaleX = (double)dstWidth / (double)canvasWidth;
+                    double scaleY = (double)dstHeight / (double)canvasHeight;
+                    // Resize the image to the specified width and height, ignoring aspect ratio
+                    NetVips.Image im = canvas.Resize(scaleX, vscale: scaleY, kernel: Enums.Kernel.Nearest);
+                    return im;
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Failed to stich tiles.");
+                if(canvas!=null)
+                canvas.Dispose();
+                bts = null;
+                Console.WriteLine(e.ToString());
+                Console.WriteLine(e.Message);
+            }
+            return canvas;
+        }
+
+        public static Image<Rgb24> CreateImageFromBytes(byte[] rgbBytes, int width, int height)
+        {
+            if (rgbBytes.Length != width * height * 3)
+            {
+                throw new ArgumentException("Byte array size does not match the dimensions of the image");
+            }
+
+            // Create a new image of the specified size
+            Image<Rgb24> image = new Image<Rgb24>(width, height);
+
+            // Index for the byte array
+            int byteIndex = 0;
+
+            // Iterate over the image pixels
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    // Create a color from the next three bytes
+                    Rgb24 color = new Rgb24(rgbBytes[byteIndex], rgbBytes[byteIndex + 1], rgbBytes[byteIndex + 2]);
+                    byteIndex += 3;
+                    // Set the pixel
+                    image[x, y] = color;
+                }
+            }
+
+            return image;
+        }
+
     }
+
 
     public class TileUtil
     {
