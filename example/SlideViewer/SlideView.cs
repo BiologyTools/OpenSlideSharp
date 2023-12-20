@@ -114,15 +114,15 @@ namespace SlideViewer
                 if (!openSlide)
                 {
                     _slideSource.GetSlice(new SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
-                    byte[] bts = ImageToByteArray(OpenSlideBase.LastSlice);
-                    Pixbuf pf = new Pixbuf(bts);
+                    byte[] bts = OpenSlideBase.LastSlice;
+                    Pixbuf pf = new Pixbuf(bts,false,8,(int)OpenSlideBase.destExtent.Width, (int)OpenSlideBase.destExtent.Height, (int)OpenSlideBase.destExtent.Width*3);
                     Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
                 }
                 else
                 {
                     _openSlideBase.GetSlice(new OpenSlideGTK.SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
-                    byte[] bts = ImageToByteArray(OpenSlideGTK.OpenSlideBase.LastSlice);
-                    Pixbuf pf = new Pixbuf(bts);
+                    byte[] bts = OpenSlideGTK.OpenSlideBase.LastSlice;
+                    Pixbuf pf = new Pixbuf(bts, false, 8, (int)OpenSlideGTK.OpenSlideBase.destExtent.Width, (int)OpenSlideGTK.OpenSlideBase.destExtent.Height, (int)OpenSlideGTK.OpenSlideBase.destExtent.Width * 3);
                     Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
                 }
             }

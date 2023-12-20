@@ -45,21 +45,12 @@ namespace SlideViewer
                 var bytes = _slideSource.GetSlice(sliceInfo);
                 if (bytes != null && _lastFeatures.FirstOrDefault() is IFeature feature)
                 {
-                    feature = new RasterFeature(new MRaster(ImageToByteArray(bytes), box2));
+                    feature = new RasterFeature(new MRaster(bytes, box2));
                 }
             }
             return _lastFeatures;
         }
-        static byte[] ImageToByteArray(Image<Rgb24> image)
-        {
-            using (MemoryStream memoryStream = new MemoryStream())
-            {
-                // Save the image to the MemoryStream using PNG format
-                // You can change the format to JPEG or any other supported format
-                image.Save(memoryStream, new PngEncoder());
-                return memoryStream.ToArray();
-            }
-        }
+
         /*
         public override void RefreshData(MRect extent, double resolution, ChangeType changeType)
         {

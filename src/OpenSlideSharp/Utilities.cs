@@ -29,15 +29,15 @@ namespace OpenSlideGTK
                 return null;
             srcPixelExtent = srcPixelExtent.ToIntegerExtent();
             dstPixelExtent = dstPixelExtent.ToIntegerExtent();
-            int canvasWidth = (int)Math.Ceiling(srcPixelExtent.Width);
-            int canvasHeight = (int)Math.Ceiling(srcPixelExtent.Height);
-            var dstWidth = (int)Math.Ceiling(dstPixelExtent.Width);
-            var dstHeight = (int)Math.Ceiling(dstPixelExtent.Height);
+            int canvasWidth = (int)srcPixelExtent.Width;
+            int canvasHeight = (int)srcPixelExtent.Height;
+            var dstWidth = (int)dstPixelExtent.Width;
+            var dstHeight = (int)dstPixelExtent.Height;
             Image<Rgb24> canvas = new Image<Rgb24>(canvasWidth, canvasHeight);
             foreach (var tile in srcPixelTiles)
             {
                 var tileExtent = tile.Item1.ToIntegerExtent();
-                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)Math.Ceiling(tileExtent.Width), (int)Math.Ceiling(tileExtent.Height));
+                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)tileExtent.Width, (int)tileExtent.Height);
                 var intersect = srcPixelExtent.Intersect(tileExtent);
                 var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
                 var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
@@ -115,7 +115,7 @@ namespace OpenSlideGTK
                     var tileExtent = tile.Item1.ToIntegerExtent();
                     fixed (byte* dat = tile.Item2)
                     {
-                        NetVips.Image im = NetVips.Image.NewFromMemory((IntPtr)dat,(ulong)tile.Item2.Length, (int)Math.Ceiling(tileExtent.Width), (int)Math.Ceiling(tileExtent.Height), 3, Enums.BandFormat.Uchar);
+                        NetVips.Image im = NetVips.Image.NewFromMemory((IntPtr)dat,(ulong)tile.Item2.Length, (int)tileExtent.Width, (int)tileExtent.Height, 3, Enums.BandFormat.Uchar);
                         var intersect = srcPixelExtent.Intersect(tileExtent);
                         var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
                         var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);

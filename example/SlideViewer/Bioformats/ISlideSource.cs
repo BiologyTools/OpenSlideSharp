@@ -46,42 +46,92 @@ namespace SlideViewer
         }
         #endregion
 
-        public abstract Image<Rgb24> GetTile(TileInfo tileInfo);
+        public abstract byte[] GetTile(TileInfo tileInfo);
 
         public abstract Task<byte[]> GetTileAsync(TileInfo tileInfo);
 
         public double MinUnitsPerPixel { get; protected set; }
 
-        protected MemoryCache<Image<Rgb24>> _bgraCache = new MemoryCache<Image<Rgb24>>();
-        public static Image<Rgb24> LastSlice;
-        public static Extent LastExtent;
-        public virtual Image<Rgb24> GetSlice(SliceInfo sliceInfo)
+        public Dictionary<TileIndex, byte[]> _bgraCache = new Dictionary<TileIndex, byte[]>();
+        public static byte[] LastSlice;
+        public static Extent destExtent;
+        public static Extent sourceExtent;
+        public static double curUnitsPerPixel = 1;
+        public static bool UseVips = true;
+        public virtual byte[] GetSlice(SliceInfo sliceInfo)
         {
-            if (sliceInfo.Extent.Intersects(Schema.Extent) && sliceInfo.Resolution != 0)
-            {
-                var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, (OpenSlideGTK.SampleMode)sliceInfo.Parame.SampleMode);
-                var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
-                var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
+            var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, (OpenSlideGTK.SampleMode)sliceInfo.Parame.SampleMode);
+            var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
+            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
 
-                Func<TileInfo, Image<Rgb24>> getOrInsterCache = new Func<TileInfo, Image<Rgb24>>(_ =>
-                 {
-                     var cache = _bgraCache.Find(_.Index);
-                     if (cache == null)
-                     {
-                         cache = GetTile(_);
-                         _bgraCache.Add(_.Index, cache);
-                     }
-                     return cache;
-                 });
-                var tiles = tileInfos.Select(_ => Tuple.Create(_.Extent.WorldToPixelInvertedY(curUnitsPerPixel), getOrInsterCache.Invoke(_))); var srcPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
-                var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
-                var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
-                var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
-                LastSlice = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
-                LastExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
-                return LastSlice;
+            Func<TileInfo, byte[]> getOrInsterCache = new Func<TileInfo, byte[]>(_ =>
+            {
+                byte[] cache = null;
+                if (_bgraCache.ContainsKey(_.Index))
+                {
+                    cache = _bgraCache[_.Index];
+                }
+                if (cache == null)
+                {
+                    cache = GetTile(_);
+                    _bgraCache.Add(_.Index, cache);
+                }
+                return cache;
+            });
+            var tiles = tileInfos.Select(_ => Tuple.Create(_.Extent.WorldToPixelInvertedY(curUnitsPerPixel), getOrInsterCache.Invoke(_)));
+            var srcPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+            var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
+            var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
+            var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
+            destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
+            sourceExtent = srcPixelExtent;
+            if (UseVips)
+            {
+                try
+                {
+                    NetVips.Image im = ImageUtil.JoinVips(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    LastSlice = im.WriteToMemory();
+                    return LastSlice;
+                }
+                catch (Exception e)
+                {
+                    UseVips = false;
+                    Console.WriteLine("Failed to use LibVips please install Libvips for your platform.");
+                    Console.WriteLine(e.Message);
+                }
             }
-            return null;
+            try
+            {
+                Image<Rgb24> im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                LastSlice = GetRgb24Bytes(im);
+                im.Dispose();
+            }
+            catch (Exception er)
+            {
+                Console.WriteLine(er.Message);
+                return null;
+            }
+            return LastSlice;
+        }
+        public byte[] GetRgb24Bytes(Image<Rgb24> image)
+        {
+            int width = image.Width;
+            int height = image.Height;
+            byte[] rgbBytes = new byte[width * height * 3]; // 3 bytes per pixel (RGB)
+
+            int byteIndex = 0;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Rgb24 pixel = image[x, y];
+                    rgbBytes[byteIndex++] = pixel.R;
+                    rgbBytes[byteIndex++] = pixel.G;
+                    rgbBytes[byteIndex++] = pixel.B;
+                }
+            }
+
+            return rgbBytes;
         }
 
         public ITileSchema Schema { get; protected set; }
@@ -105,7 +155,7 @@ namespace SlideViewer
             {
                 if (disposing)
                 {
-                    _bgraCache.Dispose();
+                    _bgraCache.Clear();
                 }
 
                 disposedValue = true;
@@ -168,7 +218,7 @@ namespace SlideViewer
         /// </summary>
         /// <param name="sliceInfo">Slice info</param>
         /// <returns></returns>
-        Image<Rgb24> GetSlice(SliceInfo sliceInfo);
+        byte[] GetSlice(SliceInfo sliceInfo);
     }
 
     /// <summary>

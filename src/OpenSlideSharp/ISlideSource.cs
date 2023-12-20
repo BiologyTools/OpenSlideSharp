@@ -367,7 +367,7 @@ namespace OpenSlideGTK
         /// <returns></returns>
         public static Extent ToIntegerExtent(this Extent extent)
         {
-            return new Extent((int)Math.Ceiling(extent.MinX), (int)Math.Ceiling(extent.MinY), (int)Math.Ceiling(extent.MaxX), (int)Math.Ceiling(extent.MaxY));
+            return new Extent((int)Math.Round(extent.MinX), (int)Math.Round(extent.MinY), (int)Math.Round(extent.MaxX), (int)Math.Round(extent.MaxY));
         }
     }
 
