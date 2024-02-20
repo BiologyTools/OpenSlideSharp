@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using BioGTK;
+using BioLib;
 using OpenSlideGTK;
 using AForge;
 using SixLabors.ImageSharp.PixelFormats;

@@ -7,6 +7,7 @@
     <Version>1.1.1</Version>
     <StartupObject>SlideViewer.Program</StartupObject>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,18 +17,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BioLib" Version="1.7.0" />
+    <PackageReference Include="BioLib" Version="2.2.1" />
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="GtkSharp" Version="3.24.24.95" />
-    <PackageReference Include="Mapsui" Version="4.1.1" />
-    <PackageReference Include="Mapsui.Extensions" Version="4.1.1" />
-    <PackageReference Include="Mapsui.Tiling" Version="4.1.1" />
+    <PackageReference Include="Mapsui" Version="4.1.3" />
+    <PackageReference Include="Mapsui.Extensions" Version="4.1.3" />
+    <PackageReference Include="Mapsui.Tiling" Version="4.1.3" />
+    <PackageReference Include="NetVips" Version="2.4.0" />
+    <PackageReference Include="NetVips.Native.win-x64" Version="8.15.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Packaging.Targets" Version="0.1.220">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.2" />
   </ItemGroup>
 
   <ItemGroup>

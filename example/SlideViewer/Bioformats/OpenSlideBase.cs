@@ -5,10 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using OpenSlideGTK;
-using BioGTK;
+using BioLib;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using sun.awt.image;
 
 namespace SlideViewer
 {
@@ -99,7 +98,7 @@ namespace SlideViewer
             try
             {
                 //bgraData = BioImage.OpenOME(image.file, tileInfo.Index.Level,false,false,true,(int)curLevelOffsetXPixel,(int)curLevelOffsetYPixel,curTileWidth,curTileHeight).Buffers[0].RGBBytes;
-                bgraData = BioImage.GetTile(image, new AForge.ZCT(), tileInfo.Index.Level, (int)curLevelOffsetXPixel, (int)curLevelOffsetYPixel, curTileWidth, curTileHeight).RGBBytes;
+                bgraData = BioImage.GetTile(image, new AForge.ZCT(), tileInfo.Index.Level, (int)tileInfo.Extent.MinX, (int)-tileInfo.Extent.MinY, curTileWidth, curTileHeight).RGBBytes;
             }
             catch (Exception e)
             {

@@ -11,10 +11,11 @@ using BruTile.Predefined;
 using Mapsui.Tiling.Layers;
 using Mapsui.Tiling.Fetcher;
 using OpenSlideGTK;
-using BioGTK;
+using BioLib;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
+using AForge;
 
 namespace SlideViewer
 {
@@ -233,10 +234,18 @@ namespace SlideViewer
             p = new Point(e.Event.X, e.Event.Y);
         }
         Point up = new Point(0,0);
+        PointD PyramidalOrigin
+        {
+            get
+            {
+                return new PointD(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY);  
+            }
+        }
         private void ImageView_ButtonReleaseEvent(object o, ButtonReleaseEventArgs e)
         {
             up = new Point(e.Event.X, e.Event.Y);
             Point p = new Point(up.X - down.X,up.Y - down.Y);
+            MainMap.Navigator.CenterOn(PyramidalOrigin.X + p.X, PyramidalOrigin.Y + p.Y);
         }
         Point down = new Point(0, 0);
         private void ImageView_ButtonPressEvent(object o, ButtonPressEventArgs e)

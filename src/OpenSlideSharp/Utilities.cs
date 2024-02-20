@@ -37,14 +37,17 @@ namespace OpenSlideGTK
             foreach (var tile in srcPixelTiles)
             {
                 var tileExtent = tile.Item1.ToIntegerExtent();
-                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)tileExtent.Width, (int)tileExtent.Height);
                 var intersect = srcPixelExtent.Intersect(tileExtent);
+                if (intersect.Width == 0 || intersect.Height == 0)
+                    continue;
+                if(tile.Item2 == null)
+                    continue;
+                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)tileExtent.Width, (int)tileExtent.Height);
                 var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
                 var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
                 var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
                 var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
-                if (intersect.Width == 0 || intersect.Height == 0)
-                    continue;
+                
                 try
                 {
                     //We copy the tile region to the canvas.
@@ -91,63 +94,53 @@ namespace OpenSlideGTK
         /// <returns></returns>
         public static unsafe NetVips.Image JoinVips(IEnumerable<Tuple<Extent, byte[]>> srcPixelTiles, Extent srcPixelExtent, Extent dstPixelExtent)
         {
-            NetVips.Image canvas = null;
-            
-            if (srcPixelTiles == null || srcPixelTiles.Count() == 0)
+            if (srcPixelTiles == null || !srcPixelTiles.Any())
                 return null;
+
             srcPixelExtent = srcPixelExtent.ToIntegerExtent();
             dstPixelExtent = dstPixelExtent.ToIntegerExtent();
-            int canvasWidth = (int)Math.Ceiling(srcPixelExtent.Width);
-            int canvasHeight = (int)Math.Ceiling(srcPixelExtent.Height);
-            int dstWidth = (int)Math.Ceiling(dstPixelExtent.Width);
-            int dstHeight = (int)Math.Ceiling(dstPixelExtent.Height);
-            byte[] bts = new byte[canvasWidth * 3 * canvasHeight];
-            int i = 0;
-            int tls = srcPixelTiles.Count();
-            try
+            int canvasWidth = (int)srcPixelExtent.Width;
+            int canvasHeight = (int)srcPixelExtent.Height;
+
+            // Create a base canvas. Adjust as necessary, for example, using a transparent image if needed.
+            NetVips.Image canvas = NetVips.Image.Black(canvasWidth, canvasHeight, bands: 3);
+
+            foreach (var tile in srcPixelTiles)
             {
-                fixed (byte* dat = bts)
-                {
-                    canvas = NetVips.Image.NewFromMemory((IntPtr)dat, (ulong)bts.Length, canvasWidth, canvasHeight, 3, Enums.BandFormat.Uchar);
-                }
-                foreach (var tile in srcPixelTiles)
+                if (tile.Item2 == null)
+                    continue;
+
+                fixed (byte* pTileData = tile.Item2)
                 {
                     var tileExtent = tile.Item1.ToIntegerExtent();
-                    fixed (byte* dat = tile.Item2)
+                    NetVips.Image tileImage = NetVips.Image.NewFromMemory((IntPtr)pTileData, (ulong)tile.Item2.Length, (int)tileExtent.Width, (int)tileExtent.Height, 3, Enums.BandFormat.Uchar);
+
+                    // Calculate positions and sizes for cropping and inserting
+                    var intersect = srcPixelExtent.Intersect(tileExtent);
+                    if (intersect.Width == 0 || intersect.Height == 0)
+                        continue;
+
+                    int tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
+                    int tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
+                    int canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
+                    int canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
+
+                    using (var croppedTile = tileImage.Crop(tileOffsetPixelX, tileOffsetPixelY, (int)intersect.Width, (int)intersect.Height))
                     {
-                        NetVips.Image im = NetVips.Image.NewFromMemory((IntPtr)dat,(ulong)tile.Item2.Length, (int)tileExtent.Width, (int)tileExtent.Height, 3, Enums.BandFormat.Uchar);
-                        var intersect = srcPixelExtent.Intersect(tileExtent);
-                        var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
-                        var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
-                        var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
-                        var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
-                        if (intersect.Width == 0 || intersect.Height == 0)
-                            continue;
-                        NetVips.Image t = im.Crop(tileOffsetPixelX, tileOffsetPixelY,(int)Math.Ceiling(intersect.Width),(int)Math.Ceiling(intersect.Height));
-                        canvas = canvas.Insert(t,canvasOffsetPixelX, canvasOffsetPixelY);
-                        t.Dispose();
-                        i++;
+                        // Instead of inserting directly, we composite over the base canvas
+                        canvas = canvas.Composite2(croppedTile, Enums.BlendMode.Over, canvasOffsetPixelX, canvasOffsetPixelY);
                     }
                 }
-                if (dstWidth != canvasWidth || dstHeight != canvasHeight)
-                {
-                    // Calculate scaling factors for width and height
-                    double scaleX = (double)dstWidth / (double)canvasWidth;
-                    double scaleY = (double)dstHeight / (double)canvasHeight;
-                    // Resize the image to the specified width and height, ignoring aspect ratio
-                    NetVips.Image im = canvas.Resize(scaleX, vscale: scaleY, kernel: Enums.Kernel.Nearest);
-                    return im;
-                }
             }
-            catch (Exception e)
+
+            // Resize if the destination extent differs from the source canvas size
+            if ((int)dstPixelExtent.Width != canvasWidth || (int)dstPixelExtent.Height != canvasHeight)
             {
-                Console.WriteLine("Failed to stich tiles.");
-                if(canvas!=null)
-                canvas.Dispose();
-                bts = null;
-                Console.WriteLine(e.ToString());
-                Console.WriteLine(e.Message);
+                double scaleX = (double)dstPixelExtent.Width / canvasWidth;
+                double scaleY = (double)dstPixelExtent.Height / canvasHeight;
+                canvas = canvas.Resize(scaleX, vscale: scaleY, kernel: Enums.Kernel.Nearest);
             }
+
             return canvas;
         }
 

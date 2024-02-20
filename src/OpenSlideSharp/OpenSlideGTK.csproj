@@ -5,9 +5,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Fixed issue with libpath for latest version of openslide. As well as other bug fixes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Bug fixes.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>1.3.1</Version>
+    <Version>1.4.0</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -15,6 +15,13 @@
     <RepositoryUrl>https://github.com/BiologyTools/OpenSlideSharp</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\..\openslide_logo.png">

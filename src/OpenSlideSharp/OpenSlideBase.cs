@@ -109,9 +109,9 @@ namespace OpenSlideGTK
             for (int i = 0, j = 0; i < rgbaArray.Length; i += 4, j += 3)
             {
                 // Copy the R, G, B values, skip the A value
-                rgbArray[j] = rgbaArray[i];     // R
+                rgbArray[j] = rgbaArray[i + 2];     // B
                 rgbArray[j + 1] = rgbaArray[i + 1]; // G
-                rgbArray[j + 2] = rgbaArray[i + 2]; // B
+                rgbArray[j + 2] = rgbaArray[i]; // R
             }
 
             return rgbArray;
