@@ -6,7 +6,7 @@
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
     <PackageReleaseNotes>Fixed stack overflow error for large number of tiles.</PackageReleaseNotes>
-    <Description>Cross platform Windows, Linux &amp; Mac .NET6 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
+    <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
     <Version>1.6.0</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
