@@ -36,20 +36,19 @@ namespace OpenSlideGTK
             Image<Rgb24> canvas = new Image<Rgb24>(canvasWidth, canvasHeight);
             foreach (var tile in srcPixelTiles)
             {
-                var tileExtent = tile.Item1.ToIntegerExtent();
-                var intersect = srcPixelExtent.Intersect(tileExtent);
-                if (intersect.Width == 0 || intersect.Height == 0)
-                    continue;
-                if(tile.Item2 == null)
-                    continue;
-                Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)tileExtent.Width, (int)tileExtent.Height);
-                var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
-                var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
-                var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
-                var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
-                
                 try
                 {
+                    var tileExtent = tile.Item1.ToIntegerExtent();
+                    var intersect = srcPixelExtent.Intersect(tileExtent);
+                    if (intersect.Width == 0 || intersect.Height == 0)
+                        continue;
+                    if(tile.Item2 == null)
+                        continue;
+                    Image<Rgb24> tileRawData = CreateImageFromBytes(tile.Item2, (int)tileExtent.Width, (int)tileExtent.Height);
+                    var tileOffsetPixelX = (int)Math.Ceiling(intersect.MinX - tileExtent.MinX);
+                    var tileOffsetPixelY = (int)Math.Ceiling(intersect.MinY - tileExtent.MinY);
+                    var canvasOffsetPixelX = (int)Math.Ceiling(intersect.MinX - srcPixelExtent.MinX);
+                    var canvasOffsetPixelY = (int)Math.Ceiling(intersect.MinY - srcPixelExtent.MinY);
                     //We copy the tile region to the canvas.
                     for (int y = 0; y < intersect.Height; y++)
                     {
@@ -62,12 +61,13 @@ namespace OpenSlideGTK
                             canvas[indx, indy] = tileRawData[tindx, tindy];
                         }
                     }
+                    tileRawData.Dispose();
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.Message);
+                    Console.WriteLine(e.ToString());
                 }
-                tileRawData.Dispose();
+                
             }
             if (dstWidth != canvasWidth || dstHeight != canvasHeight)
             {
