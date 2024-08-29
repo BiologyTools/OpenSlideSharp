@@ -5,9 +5,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Fixed stack overflow error for large number of tiles.</PackageReleaseNotes>
+    <PackageReleaseNotes>BGR-RGB fix.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>1.6.0</Version>
+    <Version>1.6.1</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -24,6 +24,14 @@
     <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="tile_copy.ptx" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="tile_copy.ptx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <None Include="..\..\openslide_logo.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
@@ -35,9 +43,11 @@
   </ItemGroup>
   
   <ItemGroup>
+    <PackageReference Include="AForgeBio" Version="1.7.1.1" />
     <PackageReference Include="BruTile" Version="5.0.6" />
-    <PackageReference Include="Mapsui" Version="4.1.5" />
-    <PackageReference Include="Mapsui.Tiling" Version="4.1.5" />
+    <PackageReference Include="ManagedCuda" Version="10.0.0" />
+    <PackageReference Include="Mapsui" Version="4.1.7" />
+    <PackageReference Include="Mapsui.Tiling" Version="4.1.7" />
     <PackageReference Include="NetVips" Version="2.4.1" />
     <PackageReference Include="NetVips.Native" Version="8.15.2" />
     <PackageReference Include="NetVips.Native.linux-arm64" Version="8.15.2" />
@@ -46,7 +56,18 @@
     <PackageReference Include="NetVips.Native.osx-x64" Version="8.15.2" />
     <PackageReference Include="NetVips.Native.win-arm64" Version="8.15.2" />
     <PackageReference Include="NetVips.Native.win-x64" Version="8.15.2" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Reference Include="SixLabors.ImageSharp">
+      <HintPath>D:\.nuget\sixlabors.imagesharp\3.1.5\lib\net6.0\SixLabors.ImageSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Update="tile_copy.cu">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   
 </Project>

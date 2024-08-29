@@ -7,10 +7,6 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System.IO;
 using NetVips;
-using static System.Net.Mime.MediaTypeNames;
-using System.Runtime.InteropServices;
-using System.Reflection;
-using static System.Net.WebRequestMethods;
 
 namespace OpenSlideGTK
 {
@@ -163,7 +159,7 @@ namespace OpenSlideGTK
                 for (int x = 0; x < width; x++)
                 {
                     // Create a color from the next three bytes
-                    Rgb24 color = new Rgb24(rgbBytes[byteIndex], rgbBytes[byteIndex + 1], rgbBytes[byteIndex + 2]);
+                    Rgb24 color = new Rgb24(rgbBytes[byteIndex + 2], rgbBytes[byteIndex + 1], rgbBytes[byteIndex]);
                     byteIndex += 3;
                     // Set the pixel
                     image[x, y] = color;

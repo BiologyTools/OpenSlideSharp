@@ -7,10 +7,173 @@ using System.Linq;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Diagnostics;
+using AForge;
+using NetVips;
 
 namespace OpenSlideGTK
 {
+    public class LruCache<TKey, TValue>
+    {
+        private readonly int capacity;
+        public Dictionary<Info, LinkedListNode<(Info key, TValue value)>> cacheMap = new Dictionary<Info, LinkedListNode<(Info key, TValue value)>>();
+        private LinkedList<(Info key, TValue value)> lruList = new LinkedList<(Info key, TValue value)>();
 
+        public LruCache(int capacity)
+        {
+            this.capacity = capacity;
+        }
+
+        public TValue Get(Info key)
+        {
+            foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+            {
+                Info k = item.Value.key;
+                if (k.Coordinate == key.Coordinate && k.Index == key.Index)
+                {
+                    lruList.Remove(item);
+                    lruList.AddLast(item);
+                    return item.Value.value;
+                }
+            }
+            return default(TValue);
+        }
+
+        public void Add(Info key, TValue value)
+        {
+            if (cacheMap.Count >= capacity)
+            {
+                var oldest = lruList.First;
+                if (oldest != null)
+                {
+                    lruList.RemoveFirst();
+                    cacheMap.Remove(oldest.Value.key);
+                }
+            }
+
+            if (cacheMap.ContainsKey(key))
+            {
+                lruList.Remove(cacheMap[key]);
+            }
+
+            var newNode = new LinkedListNode<(Info key, TValue value)>((key, value));
+            lruList.AddLast(newNode);
+            cacheMap[key] = newNode;
+        }
+        public void Dispose()
+        {
+            foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+            {
+                lruList.Remove(item);
+            }
+        }
+    }
+    public class Info
+    {
+        public int Level { get; set; }
+        public ZCT Coordinate { get; set; }
+        public TileIndex Index { get; set; }
+        public Extent Extent { get; set; }
+        public Info(ZCT coordinate, TileIndex index, Extent extent, int level)
+        {
+            Coordinate = coordinate;
+            Index = index;
+            Extent = extent;
+            Level = level;
+        }
+    }
+    public class TileCache
+    {
+        public LruCache<Info, byte[]> cache;
+        private int capacity;
+        private Stitch stitch = new Stitch();
+        SlideSourceBase source = null;
+        public TileCache(SlideSourceBase source, int capacity = 1000)
+        {
+            this.source = source;
+            this.capacity = capacity;
+            this.cache = new LruCache<Info, byte[]>(capacity);
+        }
+
+        public async Task<byte[]> GetTile(Info inf)
+        {
+            byte[] data = cache.Get(inf);
+            if (data != null)
+            {
+                return data;
+            }
+            byte[] tile = await LoadTile(inf);
+            if (tile != null)
+                AddTile(inf, tile);
+            return tile;
+        }
+
+        public byte[] GetTileSync(Info inf, double unitsPerPixel)
+        {
+        A:
+            try
+            {
+                if (SlideSourceBase.useGPU)
+                {
+                    if (stitch.HasTile(inf.Extent.WorldToPixelInvertedY(unitsPerPixel)))
+                        return null;
+                }
+            }
+            catch (Exception)
+            {
+                SlideSourceBase.useGPU = false;
+                goto A;
+            }
+
+            byte[] data = cache.Get(inf);
+            if (data != null)
+            {
+                return data;
+            }
+            byte[] tile = LoadTileSync(inf);
+            if (tile != null && !SlideSourceBase.useGPU)
+                AddTile(inf, tile);
+            return tile;
+        }
+
+        private void AddTile(Info tileId, byte[] tile)
+        {
+            cache.Add(tileId, tile);
+        }
+
+        private async Task<byte[]> LoadTile(Info tileId)
+        {
+            try
+            {
+                TileInfo tf = new TileInfo();
+                tf.Index = tileId.Index;
+                tf.Extent = tileId.Extent;
+                return await source.GetTileAsync(tf);
+            }
+            catch (Exception e)
+            {
+                return null;
+            }
+        }
+        private byte[] LoadTileSync(Info tileId)
+        {
+            try
+            {
+                TileInfo tf = new TileInfo();
+                tf.Index = tileId.Index;
+                tf.Extent = tileId.Extent;
+                return source.GetTile(tf);
+            }
+            catch (Exception e)
+            {
+                return null;
+            }
+        }
+        public void Dispose()
+        {
+            cache.Dispose();
+        }
+    }
     public abstract class SlideSourceBase : ISlideSource, IDisposable
     {
         #region Static
@@ -31,13 +194,18 @@ namespace OpenSlideGTK
         public static ISlideSource Create(string source, bool enableCache = true)
         {
             var ext = Path.GetExtension(source).ToUpper();
+            
             try
             {
                 if (keyValuePairs.TryGetValue(ext, out var factory) && factory != null)
                     return factory.Invoke(source, enableCache);
 
                 if (!string.IsNullOrEmpty(OpenSlideBase.DetectVendor(source)))
-                    return new OpenSlideBase(source, enableCache);
+                {
+                    var osb = new OpenSlideBase(source, enableCache);
+                    osb.cache = new TileCache(osb);
+                    return osb;
+                }
             }
             catch (Exception e) 
             { 
@@ -59,33 +227,72 @@ namespace OpenSlideGTK
         public static Extent sourceExtent;
         public static double curUnitsPerPixel = 1;
         public static bool UseVips = true;
+        public static bool useGPU = true;
+        public TileCache cache;
+        public Stitch stitch = new Stitch();
+        private PixelFormat px;
+        public PixelFormat PixelFormat
+        {
+            get { return px; }
+        }
         public virtual byte[] GetSlice(SliceInfo sliceInfo)
         {
+            A:
             var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, sliceInfo.Parame.SampleMode);
             var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
-
-            Func<TileInfo, byte[]> getOrInsterCache = new Func<TileInfo, byte[]>(_ =>
+            List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
+            foreach (BruTile.TileInfo t in tileInfos)
             {
-                byte[] cache = null;
-                if (_bgraCache.ContainsKey(_.Index))
+                Info tf = new Info(new ZCT(), t.Index,t.Extent,curLevel);
+                byte[] c = cache.GetTileSync(tf, curUnitsPerPixel);
+                if (c != null)
                 {
-                    cache = _bgraCache[_.Index];
+                    if (PixelFormat == PixelFormat.Format16bppGrayScale)
+                    {
+                        c = Convert16BitToRGB(c);
+                    }
+                    else
+                    if (PixelFormat == PixelFormat.Format48bppRgb)
+                    {
+                        c = Convert48BitToRGB(c);
+                    }
+                    if (useGPU)
+                    {
+                        try
+                        {
+                            stitch.AddTile(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
+                        }
+                        catch (Exception)
+                        {
+                            useGPU = false;
+                            goto A;
+                        }
+                    }
+                    else
+                        tiles.Add(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
                 }
-                if (cache == null)
-                {
-                    cache = GetTile(_);
-                    _bgraCache.Add(_.Index, cache);
-                }
-                return cache;
-            });
-            var tiles = tileInfos.Select(_ => Tuple.Create(_.Extent.WorldToPixelInvertedY(curUnitsPerPixel), getOrInsterCache.Invoke(_)));
+            }
             var srcPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
             var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
             var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
             var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
             destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
             sourceExtent = srcPixelExtent;
+            if(useGPU)
+            {
+                try
+                {
+                    return stitch.StitchImages((int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY));
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message.ToString());
+                    UseVips = true;
+                    useGPU = false;
+                }
+            }
+            else
             if (UseVips)
             {
                 try
@@ -114,6 +321,58 @@ namespace OpenSlideGTK
             }
             return LastSlice;
         }
+        public static byte[] Convert16BitToRGB(byte[] input)
+        {
+            if (input.Length % 2 != 0)
+                throw new ArgumentException("Input array length must be even.");
+
+            int pixelCount = input.Length / 2;
+            byte[] output = new byte[pixelCount * 3]; // RGB byte array
+
+            for (int i = 0; i < pixelCount; i++)
+            {
+                // Combine two bytes into a single 16-bit value
+                ushort grayValue = (ushort)((input[i * 2 + 1] << 8) | input[i * 2]);
+
+                // Normalize the 16-bit grayscale value to an 8-bit range
+                byte normalizedValue = (byte)(grayValue >> 8); // Scale down to 0-255
+
+                // Set RGB components to the grayscale value
+                output[i * 3] = normalizedValue;     // Red
+                output[i * 3 + 1] = normalizedValue; // Green
+                output[i * 3 + 2] = normalizedValue; // Blue
+            }
+
+            return output;
+        }
+        public byte[] Convert48BitToRGB(byte[] input)
+        {
+            if (input.Length % 6 != 0)
+                throw new ArgumentException("Input array length must be a multiple of 6.");
+
+            int pixelCount = input.Length / 6;
+            byte[] output = new byte[pixelCount * 3]; // RGB byte array
+
+            for (int i = 0; i < pixelCount; i++)
+            {
+                // Extract 16-bit values for each color channel
+                ushort rHigh = (ushort)(input[i * 6] << 8 | input[i * 6 + 1]);
+                ushort gHigh = (ushort)(input[i * 6 + 2] << 8 | input[i * 6 + 3]);
+                ushort bHigh = (ushort)(input[i * 6 + 4] << 8 | input[i * 6 + 5]);
+
+                // Normalize to 8-bit values (0-255)
+                byte r = (byte)(rHigh >> 8); // Scale down to 0-255
+                byte g = (byte)(gHigh >> 8); // Scale down to 0-255
+                byte b = (byte)(bHigh >> 8); // Scale down to 0-255
+
+                // Assign to output array
+                output[i * 3] = r;     // Red
+                output[i * 3 + 1] = g; // Green
+                output[i * 3 + 2] = b; // Blue
+            }
+
+            return output;
+        }
         public byte[] GetRgb24Bytes(Image<Rgb24> image)
         {
             int width = image.Width;
@@ -133,6 +392,26 @@ namespace OpenSlideGTK
             }
 
             return rgbBytes;
+        }
+        public byte[] Get16Bytes(Image<L16> image)
+        {
+            int width = image.Width;
+            int height = image.Height;
+            byte[] bytes = new byte[width * height * 2];
+
+            int byteIndex = 0;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    L16 pixel = image[x, y];
+                    byte[] bts = BitConverter.GetBytes(pixel.PackedValue);
+                    bytes[byteIndex++] = bts[0];
+                    bytes[byteIndex++] = bts[1];
+                }
+            }
+
+            return bytes;
         }
 
         public ITileSchema Schema { get; protected set; }
