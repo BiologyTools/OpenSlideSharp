@@ -12,7 +12,7 @@ Thank you to @yigolden for his work on [OpenSlideNET](https://github.com/yigolde
 
 Nuget    
 ```ps
-Install-Package OpenSlideGTK -Version 1.6.0
+Install-Package OpenSlideGTK -Version 1.8.0
 ```
 
 ## Index
@@ -20,4 +20,4 @@ Install-Package OpenSlideGTK -Version 1.6.0
 1.  [OpenSlideGTK](/src/OpenSlideGTK)    
     Openslide warpper, include DeepZoomGenerator, but no native *.dlls.
 2.  [SlideViewer](/example/SlideViewer/)
-    .NET6 Cross-platform example project for Viewing Slide with GTK.
+    .NET8 Cross-platform example project for Viewing Slide with GTK.

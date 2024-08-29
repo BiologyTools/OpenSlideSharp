@@ -24,9 +24,6 @@
     <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="tile_copy.ptx" />
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="tile_copy.ptx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
