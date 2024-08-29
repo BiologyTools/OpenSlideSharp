@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>BGR-RGB fix.</PackageReleaseNotes>
+    <PackageReleaseNotes>BGR-RGB fix, CUDA acceleration of stitching.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
     <Version>1.6.1</Version>
     <Title>OpenSlideGTK</Title>
