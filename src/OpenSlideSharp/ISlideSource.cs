@@ -9,7 +9,6 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using AForge;
-using NetVips;
 
 namespace OpenSlideGTK
 {
@@ -88,6 +87,7 @@ namespace OpenSlideGTK
         private int capacity;
         private Stitch stitch = new Stitch();
         SlideSourceBase source = null;
+        public GLStitch GLS;
         public TileCache(SlideSourceBase source, int capacity = 1000)
         {
             this.source = source;
@@ -113,7 +113,7 @@ namespace OpenSlideGTK
         A:
             try
             {
-                if (SlideSourceBase.useGPU)
+                if (SlideSourceBase.useGL)
                 {
                     if (stitch.HasTile(inf.Extent.WorldToPixelInvertedY(unitsPerPixel)))
                         return null;
@@ -121,7 +121,7 @@ namespace OpenSlideGTK
             }
             catch (Exception)
             {
-                SlideSourceBase.useGPU = false;
+                SlideSourceBase.useGL = false;
                 goto A;
             }
 
@@ -131,7 +131,7 @@ namespace OpenSlideGTK
                 return data;
             }
             byte[] tile = LoadTileSync(inf);
-            if (tile != null && !SlideSourceBase.useGPU)
+            if (tile != null && !SlideSourceBase.useGL)
                 AddTile(inf, tile);
             return tile;
         }
@@ -227,7 +227,7 @@ namespace OpenSlideGTK
         public static Extent sourceExtent;
         public static double curUnitsPerPixel = 1;
         public static bool UseVips = true;
-        public static bool useGPU = true;
+        public static bool useGL = true;
         public TileCache cache;
         public Stitch stitch = new Stitch();
         private PixelFormat px;
@@ -257,15 +257,15 @@ namespace OpenSlideGTK
                     {
                         c = Convert48BitToRGB(c);
                     }
-                    if (useGPU)
+                    if (useGL)
                     {
                         try
                         {
                             stitch.AddTile(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
                         }
-                        catch (Exception)
+                        catch (Exception e)
                         {
-                            useGPU = false;
+                            useGL = false;
                             goto A;
                         }
                     }
@@ -279,7 +279,7 @@ namespace OpenSlideGTK
             var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
             destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
             sourceExtent = srcPixelExtent;
-            if(useGPU)
+            if(useGL)
             {
                 try
                 {
@@ -289,7 +289,7 @@ namespace OpenSlideGTK
                 {
                     Console.WriteLine(e.Message.ToString());
                     UseVips = true;
-                    useGPU = false;
+                    useGL = false;
                 }
             }
             else
