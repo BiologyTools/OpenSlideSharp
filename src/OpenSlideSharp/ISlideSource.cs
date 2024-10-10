@@ -9,6 +9,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using AForge;
+using NetVips;
 
 namespace OpenSlideGTK
 {
@@ -87,7 +88,6 @@ namespace OpenSlideGTK
         private int capacity;
         private Stitch stitch = new Stitch();
         SlideSourceBase source = null;
-        public GLStitch GLS;
         public TileCache(SlideSourceBase source, int capacity = 1000)
         {
             this.source = source;
@@ -113,7 +113,7 @@ namespace OpenSlideGTK
         A:
             try
             {
-                if (SlideSourceBase.useGL)
+                if (SlideSourceBase.useGPU)
                 {
                     if (stitch.HasTile(inf.Extent.WorldToPixelInvertedY(unitsPerPixel)))
                         return null;
@@ -121,7 +121,7 @@ namespace OpenSlideGTK
             }
             catch (Exception)
             {
-                SlideSourceBase.useGL = false;
+                SlideSourceBase.useGPU = false;
                 goto A;
             }
 
@@ -131,7 +131,7 @@ namespace OpenSlideGTK
                 return data;
             }
             byte[] tile = LoadTileSync(inf);
-            if (tile != null && !SlideSourceBase.useGL)
+            if (tile != null && !SlideSourceBase.useGPU)
                 AddTile(inf, tile);
             return tile;
         }
@@ -226,8 +226,10 @@ namespace OpenSlideGTK
         public static Extent destExtent;
         public static Extent sourceExtent;
         public static double curUnitsPerPixel = 1;
+        private int level;
+        private ZCT coord;
         public static bool UseVips = true;
-        public static bool useGL = true;
+        public static bool useGPU = true;
         public TileCache cache;
         public Stitch stitch = new Stitch();
         private PixelFormat px;
@@ -235,39 +237,42 @@ namespace OpenSlideGTK
         {
             get { return px; }
         }
-        public virtual byte[] GetSlice(SliceInfo sliceInfo)
+        public void SetSliceInfo(int level,PixelFormat px,ZCT coord)
         {
-            A:
-            var curLevel = TileUtil.GetLevel(Schema.Resolutions, sliceInfo.Resolution, sliceInfo.Parame.SampleMode);
+            this.px = px;
+            this.level = level;
+            this.coord = coord;
+        }
+        public byte[] GetSlice(SliceInfo sliceInfo)
+        {
+            if (cache == null)
+                cache = new TileCache(this);
+            var curLevel = level;
             var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
+
             foreach (BruTile.TileInfo t in tileInfos)
             {
-                Info tf = new Info(new ZCT(), t.Index,t.Extent,curLevel);
+                Info tf = new Info(coord, t.Index, t.Extent, curLevel);
                 byte[] c = cache.GetTileSync(tf, curUnitsPerPixel);
                 if (c != null)
                 {
-                    if (PixelFormat == PixelFormat.Format16bppGrayScale)
+                    if (px == PixelFormat.Format16bppGrayScale)
                     {
                         c = Convert16BitToRGB(c);
                     }
                     else
-                    if (PixelFormat == PixelFormat.Format48bppRgb)
+                    if (px == PixelFormat.Format48bppRgb)
                     {
                         c = Convert48BitToRGB(c);
                     }
-                    if (useGL)
+                    if (useGPU)
                     {
-                        try
-                        {
-                            stitch.AddTile(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
-                        }
-                        catch (Exception e)
-                        {
-                            useGL = false;
-                            goto A;
-                        }
+                        TileInfo tileInfo = new TileInfo();
+                        tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+                        tileInfo.Index = t.Index;
+                        stitch.AddTile(Tuple.Create(tileInfo, c));
                     }
                     else
                         tiles.Add(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
@@ -279,27 +284,25 @@ namespace OpenSlideGTK
             var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
             destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
             sourceExtent = srcPixelExtent;
-            if(useGL)
+            if (useGPU)
             {
                 try
                 {
-                    return stitch.StitchImages((int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY));
+                    return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e.Message.ToString());
                     UseVips = true;
-                    useGL = false;
+                    useGPU = false;
                 }
             }
-            else
             if (UseVips)
             {
                 try
                 {
                     NetVips.Image im = ImageUtil.JoinVips(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
-                    LastSlice = im.WriteToMemory();
-                    return LastSlice;
+                    return im.WriteToMemory();
                 }
                 catch (Exception e)
                 {
@@ -310,16 +313,28 @@ namespace OpenSlideGTK
             }
             try
             {
-                Image<Rgb24> im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
-                LastSlice = GetRgb24Bytes(im);
-                im.Dispose();
+                
+                if (px == PixelFormat.Format16bppGrayScale)
+                {
+                    SixLabors.ImageSharp.Image im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    byte[] bts = Get16Bytes((Image<L16>)im);
+                    im.Dispose();
+                    return bts;
+                }
+                else if (px == PixelFormat.Format24bppRgb)
+                {
+                    SixLabors.ImageSharp.Image im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    byte[] bts = GetRgb24Bytes((Image<Rgb24>)im);
+                    im.Dispose();
+                    return bts;
+                }
             }
             catch (Exception er)
             {
                 Console.WriteLine(er.Message);
                 return null;
             }
-            return LastSlice;
+            return null;
         }
         public static byte[] Convert16BitToRGB(byte[] input)
         {
