@@ -5,9 +5,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>CUDA stitching acceleration for OpenSlide.</PackageReleaseNotes>
+    <PackageReleaseNotes>Performance boost to CUDA stitching acceleration.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>1.9.0</Version>
+    <Version>1.9.1</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -23,6 +23,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Optimize>True</Optimize>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="tile_copy.ptx" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="tile_copy.ptx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
