@@ -137,71 +137,89 @@ namespace OpenSlideGTK
             // Return the Bitmap object
             return bitmap;
         }
-        public byte[] StitchImages(List<TileInfo> tiles,int pxwidth, int pxheight, double x, double y, double resolution)
+        public byte[] StitchImages(List<TileInfo> tiles, int pxwidth, int pxheight, double x, double y, double resolution)
         {
             try
             {
+                // Convert world coordinates of tile extents to pixel space based on resolution
                 foreach (var item in tiles)
                 {
                     item.Extent = item.Extent.WorldToPixelInvertedY(resolution);
                 }
+
                 if (!initialized)
                 {
                     Initialize();
                 }
-                // Calculate canvas size based on extents
+
+                // Calculate the bounding box (min/max extents) of the stitched image
                 double maxX = tiles.Max(t => t.Extent.MaxX);
                 double maxY = tiles.Max(t => t.Extent.MaxY);
                 double minX = tiles.Min(t => t.Extent.MinX);
                 double minY = tiles.Min(t => t.Extent.MinY);
 
-                // Calculate canvas width and height
+                // Calculate canvas size in pixels
                 int canvasWidth = (int)(maxX - minX);
                 int canvasHeight = (int)(maxY - minY);
 
-                // Allocate memory for the output stitched image
-                using (CudaDeviceVariable<byte> devCanvas = new CudaDeviceVariable<byte>(canvasWidth * canvasHeight * 3)) // Assuming 3 channels
+                // Allocate memory for the output stitched image on the GPU
+                using (CudaDeviceVariable<byte> devCanvas = new CudaDeviceVariable<byte>(canvasWidth * canvasHeight * 3)) // 3 channels for RGB
                 {
-                    // Set the block and grid sizes
+                    // Set block and grid sizes for kernel launch
                     dim3 blockSize = new dim3(16, 16, 1);
                     dim3 gridSize = new dim3((uint)((canvasWidth + blockSize.x - 1) / blockSize.x), (uint)((canvasHeight + blockSize.y - 1) / blockSize.y), 1);
-                    // Stitch tiles using the CUDA kernel
+
+                    // Iterate through each tile and copy it to the GPU canvas
                     foreach (var tile in tiles)
                     {
                         Extent extent = tile.Extent;
 
-                        CudaDeviceVariable<byte> devTile;
+                        // Find the corresponding GPU tile (already loaded into GPU memory)
+                        CudaDeviceVariable<byte> devTile = null;
                         foreach (var t in gpuTiles)
                         {
-                            if(t.Item1.Index == tile.Index)
+                            if (t.Item1.Index == tile.Index)
                             {
                                 devTile = t.Item2;
-                                int startX = (int)Math.Round(extent.MinX - minX);
-                                int startY = (int)Math.Round(extent.MinY - minY);
-                                int tileWidth = (int)Math.Round(extent.MaxX - extent.MinX);
-                                int tileHeight = (int)Math.Round(extent.MaxY - extent.MinY);
-
-                                kernel.BlockDimensions = blockSize;
-                                kernel.GridDimensions = gridSize;
-                                kernel.Run(devCanvas.DevicePointer, canvasWidth, canvasHeight, devTile.DevicePointer, tileWidth, tileHeight, startX, startY);
+                                break;
                             }
+                        }
+
+                        if (devTile != null)
+                        {
+                            // Calculate the start position on the canvas and the dimensions of the tile
+                            int startX = (int)Math.Round(extent.MinX - minX);
+                            int startY = (int)Math.Round(extent.MinY - minY);
+                            int tileWidth = (int)Math.Round(extent.MaxX - extent.MinX);
+                            int tileHeight = (int)Math.Round(extent.MaxY - extent.MinY);
+
+                            // canvasTileWidth and canvasTileHeight handle the scaling of the tile to the canvas
+                            int canvasTileWidth = tileWidth;
+                            int canvasTileHeight = tileHeight;
+
+                            // Run the CUDA kernel to copy the tile to the canvas
+                            kernel.BlockDimensions = blockSize;
+                            kernel.GridDimensions = gridSize;
+
+                            // Run the kernel, including scaling factors
+                            kernel.Run(devCanvas.DevicePointer, canvasWidth, canvasHeight, devTile.DevicePointer, 256, 256, startX, startY, canvasTileWidth, canvasTileHeight);
                         }
                     }
 
-                    // Download the result back to host
-                    byte[] stitchedImageData = new byte[canvasWidth * canvasHeight * 3];
+                    // Download the stitched image from the GPU to the host (CPU)
+                    byte[] stitchedImageData = new byte[canvasWidth * canvasHeight * 3]; // Assuming 3 channels (RGB)
                     devCanvas.CopyToHost(stitchedImageData);
 
-                    // Ensure (x, y) is within bounds of the full image
+                    // Clip (x, y) to the canvas bounds
                     int clippedX = Math.Max(0, (int)(x - minX));
                     int clippedY = Math.Max(0, (int)(y - minY));
 
-                    // Ensure viewport does not exceed the boundaries of the canvas
+                    // Make sure the viewport fits within the canvas bounds
                     int viewportWidth = pxwidth;
                     int viewportHeight = pxheight;
 
-                    // Extract the viewport region directly
-                    byte[] viewportImageData = new byte[viewportWidth * viewportHeight * 3];
+                    // Extract the viewport region from the stitched image
+                    byte[] viewportImageData = new byte[viewportWidth * viewportHeight * 3]; // Assuming 3 channels
                     System.Threading.Tasks.Parallel.For(0, viewportHeight, row =>
                     {
                         try
@@ -212,20 +230,21 @@ namespace OpenSlideGTK
                         }
                         catch (Exception ex)
                         {
-                            
+                            Console.WriteLine("An error occurred while extracting the viewport: " + ex.Message);
                         }
                     });
-                    return viewportImageData;
+
+                    return viewportImageData; // Return the extracted viewport
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("An error occurred: " + ex.Message);
-                Initialize();
+                Initialize(); // Reinitialize in case of errors
                 return null;
             }
         }
 
     }
-    
+
 }

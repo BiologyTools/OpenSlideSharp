@@ -248,7 +248,7 @@ namespace OpenSlideGTK
             if (cache == null)
                 cache = new TileCache(this);
             var curLevel = level;
-            var curUnitsPerPixel = Schema.Resolutions[curLevel].UnitsPerPixel;
+            var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
 
