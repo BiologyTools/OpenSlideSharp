@@ -237,6 +237,34 @@ namespace OpenSlideGTK
         {
             get { return px; }
         }
+        public static byte[] SwapRedBlueChannels(byte[] imageData)
+        {
+            int bytesPerPixel = 3;
+            if (bytesPerPixel < 3)
+                throw new ArgumentException("The image must have at least 3 bytes per pixel (RGB).");
+
+            // Create a new array to store the swapped channel data
+            byte[] swappedData = new byte[imageData.Length];
+
+            for (int i = 0; i < imageData.Length; i += bytesPerPixel)
+            {
+                // Copy the green channel as is
+                swappedData[i + 1] = imageData[i + 1]; // Green channel stays the same
+
+                // Swap the red and blue channels
+                swappedData[i] = imageData[i + 2];     // Red channel gets Blue's value
+                swappedData[i + 2] = imageData[i];     // Blue channel gets Red's value
+
+                // If there are more bytes per pixel (like an alpha channel), copy the rest as is
+                for (int j = 3; j < bytesPerPixel; j++)
+                {
+                    swappedData[i + j] = imageData[i + j]; // Copy other channels if any (like alpha)
+                }
+            }
+
+            return swappedData;
+        }
+
         public void SetSliceInfo(int level,PixelFormat px,ZCT coord)
         {
             this.px = px;
