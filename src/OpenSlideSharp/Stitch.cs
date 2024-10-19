@@ -105,7 +105,7 @@ namespace OpenSlideGTK
             {
                 context = new CudaContext();
                 // Load the CUDA kernel
-                kernel = context.LoadKernelPTX("tile_copy.ptx", "copyTileToCanvas");
+                kernel = context.LoadKernelPTX(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/tile_copy.ptx", "copyTileToCanvas");
                 initialized = true;
             }
             catch (Exception e)

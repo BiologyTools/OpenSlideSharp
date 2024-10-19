@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Performance boost to CUDA stitching acceleration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Performance boost to CUDA stitching acceleration. As well as Emission view mode fix.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
     <Version>1.9.1</Version>
     <Title>OpenSlideGTK</Title>
