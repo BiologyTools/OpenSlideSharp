@@ -24,9 +24,13 @@
     <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="tile_copy.cu" />
     <None Remove="tile_copy.ptx" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="tile_copy.cu">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="tile_copy.ptx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -43,7 +47,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="1.8.0" />
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="ManagedCuda" Version="10.0.0" />
     <PackageReference Include="Mapsui" Version="4.1.7" />
@@ -60,9 +63,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <None Update="tile_copy.cu">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
+    <ProjectReference Include="..\..\..\..\..\Shared\AForgeBio\AForgeBio\AForgeBio\AForgeBio.csproj" />
   </ItemGroup>
   
 </Project>

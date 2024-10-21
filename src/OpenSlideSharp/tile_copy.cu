@@ -1,32 +1,34 @@
-__global__ void copyTileToCanvas(unsigned char* canvas, int canvasWidth, int canvasHeight,
+__global__ void copyTileToCanvas(
+    unsigned char* canvas, int canvasWidth, int canvasHeight,
     unsigned char* tile, int tileWidth, int tileHeight,
-    int offsetX, int offsetY, int canvasTileWidth, int canvasTileHeight)
+    int offsetX, int offsetY,
+    int canvasTileWidth, int canvasTileHeight)
 {
     // Calculate the global x and y index for the thread
-    int canvasX = blockIdx.x * blockDim.x + threadIdx.x;
-    int canvasY = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // Check if the thread is within the bounds of the canvas
-    if (canvasX < canvasTileWidth && canvasY < canvasTileHeight) {
-        // Translate canvas coordinates into tile coordinates
-        float tileX = ((float)canvasX / canvasTileWidth) * tileWidth;
-        float tileY = ((float)canvasY / canvasTileHeight) * tileHeight;
+    // Check if the thread is within the bounds of the tile and canvas
+    if (x < canvasTileWidth && y < canvasTileHeight) {
+        int canvasX = x + offsetX;
+        int canvasY = y + offsetY;
 
-        // Find nearest tile pixel for scaling (nearest neighbor scaling)
-        int srcX = (int)tileX;
-        int srcY = (int)tileY;
+        // Ensure the canvas indices are within bounds
+        if (canvasX < canvasWidth && canvasY < canvasHeight) {
+            // Calculate corresponding tile indices, scaling tile pixels to canvas size
+            float scaleX = (float)tileWidth / (float)canvasTileWidth;
+            float scaleY = (float)tileHeight / (float)canvasTileHeight;
 
-        // Ensure the tile indices are within bounds
-        if (srcX < tileWidth && srcY < tileHeight) {
-            // Calculate the destination index for the canvas
-            int canvasIdx = ((canvasY + offsetY) * canvasWidth + (canvasX + offsetX)) * 3;
+            // Calculate tile indices by scaling the x, y coordinates
+            int tileX = min((int)ceil(x * scaleX), tileWidth);
+            int tileY = min((int)ceil(y * scaleY), tileHeight);
 
-            // Calculate the source index for the tile
-            int tileIdx = (srcY * tileWidth + srcX) * 3;
+            // Ensure tile indices are within the tile bounds
+            if (tileX < tileWidth && tileY < tileHeight) {
+                int tileIdx = (tileY * tileWidth + tileX) * 3;   // Each pixel has 3 components (RGB)
+                int canvasIdx = (canvasY * canvasWidth + canvasX) * 3;
 
-            // Ensure the canvas indices are within bounds
-            if (canvasX + offsetX < canvasWidth && canvasY + offsetY < canvasHeight) {
-                // Copy the pixel (RGB components) from tile to canvas
+                // Copy the pixel (RGB components)
                 canvas[canvasIdx] = tile[tileIdx];
                 canvas[canvasIdx + 1] = tile[tileIdx + 1];
                 canvas[canvasIdx + 2] = tile[tileIdx + 2];

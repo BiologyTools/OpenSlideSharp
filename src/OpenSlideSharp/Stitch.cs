@@ -31,7 +31,7 @@ namespace OpenSlideGTK
         // Initialize CUDA context
         private const int maxTiles = 250;
         private CudaContext context;
-        public List<Tuple<TileInfo,CudaDeviceVariable<byte>>> gpuTiles = new List<Tuple<TileInfo, CudaDeviceVariable<byte>>>();
+        public List<Tuple<TileInfo, CudaDeviceVariable<byte>>> gpuTiles = new List<Tuple<TileInfo, CudaDeviceVariable<byte>>>();
         private CudaKernel kernel;
         private bool initialized = false;
         public Stitch()
@@ -80,7 +80,7 @@ namespace OpenSlideGTK
             if (HasTile(tile.Item1))
                 return;
             byte[] tileData = tile.Item2;
-            if(gpuTiles.Count > maxTiles)
+            if (gpuTiles.Count > maxTiles)
             {
                 var ti = gpuTiles.First();
                 ti.Item2.Dispose();
@@ -97,10 +97,16 @@ namespace OpenSlideGTK
                 Initialize();
                 Console.WriteLine(e.Message);
             }
-            
+
         }
         public void Initialize()
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                OpenSlideBase.useGPU = false;
+                SlideSourceBase.useGPU = false;
+                return;
+            }
             try
             {
                 context = new CudaContext();
@@ -112,7 +118,7 @@ namespace OpenSlideGTK
             {
                 Console.WriteLine(e);
             }
-            
+
         }
         public static Bitmap ConvertCudaDeviceVariableToBitmap(CudaDeviceVariable<byte> deviceVar, int width, int height, PixelFormat pixelFormat)
         {
