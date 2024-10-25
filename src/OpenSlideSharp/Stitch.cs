@@ -79,7 +79,7 @@ namespace OpenSlideGTK
         {
             if (HasTile(tile.Item1))
                 return;
-            byte[] tileData = tile.Item2;
+            byte[] tileData = ConvertBGRToRGB(tile.Item2);
             if (gpuTiles.Count > maxTiles)
             {
                 var ti = gpuTiles.First();
