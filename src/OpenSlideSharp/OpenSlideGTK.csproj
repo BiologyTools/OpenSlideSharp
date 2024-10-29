@@ -49,16 +49,16 @@
   <ItemGroup>
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="ManagedCuda" Version="10.0.0" />
-    <PackageReference Include="Mapsui" Version="4.1.7" />
-    <PackageReference Include="Mapsui.Tiling" Version="4.1.7" />
-    <PackageReference Include="NetVips" Version="2.4.2" />
-    <PackageReference Include="NetVips.Native" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.linux-arm64" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.linux-x64" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.osx-arm64" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.osx-x64" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.win-arm64" Version="8.15.3" />
-    <PackageReference Include="NetVips.Native.win-x64" Version="8.15.3" />
+    <PackageReference Include="Mapsui" Version="4.1.8" />
+    <PackageReference Include="Mapsui.Tiling" Version="4.1.8" />
+    <PackageReference Include="NetVips" Version="3.0.0" />
+    <PackageReference Include="NetVips.Native" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.linux-arm64" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.linux-x64" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.osx-arm64" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.osx-x64" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.win-arm64" Version="8.16.0" />
+    <PackageReference Include="NetVips.Native.win-x64" Version="8.16.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
   </ItemGroup>
   
