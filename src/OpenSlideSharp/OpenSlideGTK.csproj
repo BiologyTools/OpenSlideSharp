@@ -49,9 +49,8 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="1.9.0" />
     <PackageReference Include="BruTile" Version="5.0.6" />
-    <PackageReference Include="ManagedCuda" Version="10.0.0" />
+    <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
     <PackageReference Include="Mapsui" Version="4.1.8" />
     <PackageReference Include="Mapsui.Tiling" Version="4.1.8" />
     <PackageReference Include="NetVips" Version="3.0.0" />
@@ -63,6 +62,10 @@
     <PackageReference Include="NetVips.Native.win-arm64" Version="8.16.0" />
     <PackageReference Include="NetVips.Native.win-x64" Version="8.16.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\Shared\AForgeBio\AForgeBio\AForgeBio\AForgeBio.csproj" />
   </ItemGroup>
   
 </Project>

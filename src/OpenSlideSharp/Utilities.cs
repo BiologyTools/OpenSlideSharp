@@ -7,6 +7,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System.IO;
 using NetVips;
+using GLib;
 
 namespace OpenSlideGTK
 {
@@ -139,12 +140,34 @@ namespace OpenSlideGTK
 
             return canvas;
         }
+        private static byte[] Convert32bppTo24bpp(byte[] input32bpp)
+        {
+            // Calculate the number of 24bpp bytes needed (3 bytes per pixel)
+            int inputLength = input32bpp.Length;
+            int pixelCount = inputLength / 4; // Each pixel has 4 bytes in 32bpp
+            byte[] output24bpp = new byte[pixelCount * 3];
 
+            // Loop through each pixel and transfer only the RGB channels
+            for (int i = 0, j = 0; i < inputLength; i += 4, j += 3)
+            {
+                output24bpp[j] = input32bpp[i];       // B
+                output24bpp[j + 1] = input32bpp[i + 1]; // G
+                output24bpp[j + 2] = input32bpp[i + 2]; // R
+                                                        // Skip the alpha channel (input32bpp[i + 3])
+            }
+
+            return output24bpp;
+        }
         public static Image<Rgb24> CreateImageFromBytes(byte[] rgbBytes, int width, int height)
         {
+            byte[] bts;
             if (rgbBytes.Length != width * height * 3)
             {
                 throw new ArgumentException("Byte array size does not match the dimensions of the image");
+            }
+            else if(rgbBytes.Length != width * height * 4)
+            {
+                bts = Convert32bppTo24bpp(rgbBytes);
             }
 
             // Create a new image of the specified size
