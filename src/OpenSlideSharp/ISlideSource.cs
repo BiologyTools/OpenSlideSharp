@@ -237,6 +237,26 @@ namespace OpenSlideGTK
         {
             get { return px; }
         }
+        private static byte[] Convert32bppToRgb24(byte[] rgbaBytes)
+        {
+            // Calculate the number of pixels in the 32bpp image
+            int pixelCount = rgbaBytes.Length / 4;
+
+            // Create an array for the 24bpp image (3 bytes per pixel)
+            byte[] rgbBytes = new byte[pixelCount * 3];
+
+            // Copy RGB channels from the 32bpp array to the 24bpp array
+            for (int i = 0, j = 0; i < rgbaBytes.Length; i += 4, j += 3)
+            {
+                rgbBytes[j] = rgbaBytes[i];       // Red
+                rgbBytes[j + 1] = rgbaBytes[i + 1]; // Green
+                rgbBytes[j + 2] = rgbaBytes[i + 2]; // Blue
+                                                    // Skip the alpha channel (rgbaBytes[i + 3])
+            }
+
+            return rgbBytes;
+        }
+
         public static byte[] SwapRedBlueChannels(byte[] imageData)
         {
             int bytesPerPixel = 3;
@@ -286,6 +306,11 @@ namespace OpenSlideGTK
                 byte[] c = cache.GetTileSync(tf, curUnitsPerPixel);
                 if (c != null)
                 {
+                    if (c.Length == 4 * 256 * 256)
+                    {
+                        c = Convert32bppToRgb24(c);
+                    }
+                    else
                     if (px == PixelFormat.Format16bppGrayScale)
                     {
                         c = Convert16BitToRGB(c);
