@@ -229,7 +229,7 @@ namespace OpenSlideGTK
         private int level;
         private ZCT coord;
         public static bool UseVips = true;
-        public static bool useGPU = true;
+        public static bool useGPU = false;
         public TileCache cache;
         public Stitch stitch = new Stitch();
         private PixelFormat px;
@@ -237,26 +237,7 @@ namespace OpenSlideGTK
         {
             get { return px; }
         }
-        private static byte[] Convert32bppToRgb24(byte[] rgbaBytes)
-        {
-            // Calculate the number of pixels in the 32bpp image
-            int pixelCount = rgbaBytes.Length / 4;
-
-            // Create an array for the 24bpp image (3 bytes per pixel)
-            byte[] rgbBytes = new byte[pixelCount * 3];
-
-            // Copy RGB channels from the 32bpp array to the 24bpp array
-            for (int i = 0, j = 0; i < rgbaBytes.Length; i += 4, j += 3)
-            {
-                rgbBytes[j] = rgbaBytes[i];       // Red
-                rgbBytes[j + 1] = rgbaBytes[i + 1]; // Green
-                rgbBytes[j + 2] = rgbaBytes[i + 2]; // Blue
-                                                    // Skip the alpha channel (rgbaBytes[i + 3])
-            }
-
-            return rgbBytes;
-        }
-
+       
         public static byte[] SwapRedBlueChannels(byte[] imageData)
         {
             int bytesPerPixel = 3;
@@ -308,17 +289,17 @@ namespace OpenSlideGTK
                 {
                     if (c.Length == 4 * 256 * 256)
                     {
-                        c = Convert32bppToRgb24(c);
+                        c = Bitmap.Convert32BitARGBTo24BitRGB(c);
                     }
                     else
                     if (px == PixelFormat.Format16bppGrayScale)
                     {
-                        c = Convert16BitToRGB(c);
+                        c = Bitmap.Convert16BitGrayscaleTo24BitRGB(c);
                     }
                     else
                     if (px == PixelFormat.Format48bppRgb)
                     {
-                        c = Convert48BitToRGB(c);
+                        c = Bitmap.Convert48BitTo24BitRGB(c);
                     }
                     if (useGPU)
                     {
@@ -354,7 +335,11 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    NetVips.Image im = ImageUtil.JoinVips(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    NetVips.Image im;
+                    if (px == PixelFormat.Format24bppRgb)
+                        im = ImageUtil.JoinVipsRGB24(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    else
+                        im = ImageUtil.JoinVips16(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
                     return im.WriteToMemory();
                 }
                 catch (Exception e)
@@ -369,14 +354,14 @@ namespace OpenSlideGTK
                 
                 if (px == PixelFormat.Format16bppGrayScale)
                 {
-                    SixLabors.ImageSharp.Image im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    SixLabors.ImageSharp.Image im = ImageUtil.Join16(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
                     byte[] bts = Get16Bytes((Image<L16>)im);
                     im.Dispose();
                     return bts;
                 }
                 else if (px == PixelFormat.Format24bppRgb)
                 {
-                    SixLabors.ImageSharp.Image im = ImageUtil.Join(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    SixLabors.ImageSharp.Image im = ImageUtil.JoinRGB24(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
                     byte[] bts = GetRgb24Bytes((Image<Rgb24>)im);
                     im.Dispose();
                     return bts;
@@ -389,58 +374,7 @@ namespace OpenSlideGTK
             }
             return null;
         }
-        public static byte[] Convert16BitToRGB(byte[] input)
-        {
-            if (input.Length % 2 != 0)
-                throw new ArgumentException("Input array length must be even.");
-
-            int pixelCount = input.Length / 2;
-            byte[] output = new byte[pixelCount * 3]; // RGB byte array
-
-            for (int i = 0; i < pixelCount; i++)
-            {
-                // Combine two bytes into a single 16-bit value
-                ushort grayValue = (ushort)((input[i * 2 + 1] << 8) | input[i * 2]);
-
-                // Normalize the 16-bit grayscale value to an 8-bit range
-                byte normalizedValue = (byte)(grayValue >> 8); // Scale down to 0-255
-
-                // Set RGB components to the grayscale value
-                output[i * 3] = normalizedValue;     // Red
-                output[i * 3 + 1] = normalizedValue; // Green
-                output[i * 3 + 2] = normalizedValue; // Blue
-            }
-
-            return output;
-        }
-        public byte[] Convert48BitToRGB(byte[] input)
-        {
-            if (input.Length % 6 != 0)
-                throw new ArgumentException("Input array length must be a multiple of 6.");
-
-            int pixelCount = input.Length / 6;
-            byte[] output = new byte[pixelCount * 3]; // RGB byte array
-
-            for (int i = 0; i < pixelCount; i++)
-            {
-                // Extract 16-bit values for each color channel
-                ushort rHigh = (ushort)(input[i * 6] << 8 | input[i * 6 + 1]);
-                ushort gHigh = (ushort)(input[i * 6 + 2] << 8 | input[i * 6 + 3]);
-                ushort bHigh = (ushort)(input[i * 6 + 4] << 8 | input[i * 6 + 5]);
-
-                // Normalize to 8-bit values (0-255)
-                byte r = (byte)(rHigh >> 8); // Scale down to 0-255
-                byte g = (byte)(gHigh >> 8); // Scale down to 0-255
-                byte b = (byte)(bHigh >> 8); // Scale down to 0-255
-
-                // Assign to output array
-                output[i * 3] = r;     // Red
-                output[i * 3 + 1] = g; // Green
-                output[i * 3 + 2] = b; // Blue
-            }
-
-            return output;
-        }
+        
         public byte[] GetRgb24Bytes(Image<Rgb24> image)
         {
             int width = image.Width;
