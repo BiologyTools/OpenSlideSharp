@@ -5,9 +5,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Added CUDA code .ptx in NuGet package.</PackageReleaseNotes>
+    <PackageReleaseNotes>Dependency updates, AForgeBio out of memory fix.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>2.0.0.1</Version>
+    <Version>2.0.1</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -23,10 +23,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Optimize>True</Optimize>
   </PropertyGroup>
-  <ItemGroup>
-    <None Remove="tile_copy.cu" />
-    <None Remove="tile_copy.ptx" />
-  </ItemGroup>
   <ItemGroup>
     <Content Include="tile_copy.cu">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -49,16 +45,13 @@
   </ItemGroup>
   
   <ItemGroup>
+    <PackageReference Include="AForgeBio" Version="1.9.1" />
     <PackageReference Include="BruTile" Version="5.0.6" />
     <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
     <PackageReference Include="Mapsui" Version="4.1.8" />
     <PackageReference Include="Mapsui.Tiling" Version="4.1.8" />
     <PackageReference Include="NetVips" Version="3.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Shared\AForgeBio\AForgeBio\AForgeBio\AForgeBio.csproj" />
   </ItemGroup>
   
 </Project>
