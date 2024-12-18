@@ -16,6 +16,8 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using AForge;
+using SliceInfo = BioLib.SliceInfo;
+using ISlideSource = OpenSlideGTK.ISlideSource;
 
 namespace SlideViewer
 {
@@ -114,7 +116,7 @@ namespace SlideViewer
             {
                 if (!openSlide)
                 {
-                    _slideSource.GetSlice(new SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
+                    _slideSource.GetSlice(new OpenSlideGTK.SliceInfo(MainMap.Navigator.Viewport.CenterX, MainMap.Navigator.Viewport.CenterY, MainMap.Navigator.Viewport.Width, MainMap.Navigator.Viewport.Height, resolution));
                     byte[] bts = OpenSlideBase.LastSlice;
                     Pixbuf pf = new Pixbuf(bts,false,8,(int)OpenSlideBase.destExtent.Width, (int)OpenSlideBase.destExtent.Height, (int)OpenSlideBase.destExtent.Width*3);
                     Gdk.CairoHelper.SetSourcePixbuf(e.Cr, pf, 0, 0);
@@ -272,7 +274,7 @@ namespace SlideViewer
                 openSlide = false;
                 Console.WriteLine("Failed to load image with OpenSlide.");
                 if (_slideSource != null) (_slideSource as IDisposable).Dispose();
-                _slideSource = (OpenSlideBase)SlideSourceBase.Create(file);
+                _slideSource = (OpenSlideBase)OpenSlideGTK.SlideSourceBase.Create(file);
                 if (_slideSource == null)
                 {
                     Console.WriteLine("Failed to load image with Bioformats.");
@@ -298,8 +300,8 @@ namespace SlideViewer
         private void InitMainBioformats(ISlideSource _slideSource)
         {
             MainMap.Layers.Clear();
-            MainMap.Layers.Add(new SlideViewer.SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
-            //MainMap.Layers.Add(new SlideSliceLayer(_slideSource) { Enabled = false, Opacity = 0.5 });
+            //MainMap.Layers.Add(new SlideViewer.SlideTileLayer(_slideSource, dataFetchStrategy: new MinimalDataFetchStrategy()));
+            MainMap.Layers.Add(new OpenSlideGTK.SlideSliceLayer(_slideSource) { Enabled = false, Opacity = 0.5 });
             //MainMap.Layers.Add(slice);
         }
 
