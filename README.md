@@ -18,6 +18,6 @@ Install-Package OpenSlideGTK -Version 2.1.0
 ## Index
 
 1.  [OpenSlideGTK](/src/OpenSlideGTK)    
-    Openslide warpper, include DeepZoomGenerator, but no native *.dlls.
+    Openslide wrapper, include DeepZoomGenerator, but no native *.dlls.
 2.  [SlideViewer](/example/SlideViewer/)
     .NET8 Cross-platform example project for Viewing Slide with GTK.
