@@ -1,13 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Dependency updates.</PackageReleaseNotes>
-    <Description>Cross platform Windows, Linux &amp; Mac .NET8 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>2.1.1</Version>
+    <PackageReleaseNotes>Dependency update: AForgeBio save bytes fix.</PackageReleaseNotes>
+    <Description>Cross platform Windows, Linux &amp; Mac .NET10 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
+    <Version>2.2.0</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -45,13 +45,12 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="AForgeBio" Version="2.2.1" />
-    <PackageReference Include="BruTile" Version="5.0.6" />
+    <PackageReference Include="AForgeBio" Version="2.3.0" />
     <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
-    <PackageReference Include="Mapsui" Version="4.1.8" />
-    <PackageReference Include="Mapsui.Tiling" Version="4.1.8" />
-    <PackageReference Include="NetVips" Version="3.0.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
+    <PackageReference Include="Mapsui" Version="5.0.1" />
+    <PackageReference Include="Mapsui.Tiling" Version="5.0.1" />
+    <PackageReference Include="NetVips" Version="3.1.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
   
 </Project>

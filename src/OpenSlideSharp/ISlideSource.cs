@@ -1,16 +1,13 @@
-﻿using BruTile;
-using BruTile.Cache;
+﻿using AForge;
+using BruTile;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using System.Diagnostics;
-using AForge;
-using NetVips;
-
+using PixelFormat = AForge.PixelFormat;
 namespace OpenSlideGTK
 {
     public class LruCache<TKey, TValue>
