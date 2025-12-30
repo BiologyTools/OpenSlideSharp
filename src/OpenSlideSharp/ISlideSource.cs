@@ -85,7 +85,7 @@ namespace OpenSlideGTK
         private int capacity;
         private Stitch stitch = new Stitch();
         SlideSourceBase source = null;
-        public TileCache(SlideSourceBase source, int capacity = 1000)
+        public TileCache(SlideSourceBase source, int capacity = 100)
         {
             this.source = source;
             this.capacity = capacity;
@@ -273,14 +273,14 @@ namespace OpenSlideGTK
         {
             if (cache == null)
                 cache = new TileCache(this);
-            var curLevel = level;
+            var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
-            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel);
+            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
 
             foreach (BruTile.TileInfo t in tileInfos)
             {
-                Info tf = new Info(coord, t.Index, t.Extent, curLevel);
+                Info tf = new Info(coord, t.Index, t.Extent, curLevel.Level);
                 byte[] c = cache.GetTileSync(tf, curUnitsPerPixel);
                 if (c != null)
                 {
@@ -319,6 +319,7 @@ namespace OpenSlideGTK
             {
                 try
                 {
+                    if(tileInfos.Count() > 0)
                     return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                 }
                 catch (Exception e)

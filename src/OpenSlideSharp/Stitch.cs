@@ -29,7 +29,7 @@ namespace OpenSlideGTK
             }
         }
         // Initialize CUDA context
-        private const int maxTiles = 250;
+        private const int maxTiles = 100;
         private CudaContext context;
         public List<Tuple<TileInfo, CudaDeviceVariable<byte>>> gpuTiles = new List<Tuple<TileInfo, CudaDeviceVariable<byte>>>();
         private CudaKernel kernel;
