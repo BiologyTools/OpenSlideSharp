@@ -119,7 +119,7 @@ namespace OpenSlideGTK
 
         public override async Task<byte[]> GetTileAsync(TileInfo tileInfo)
         {
-            throw new NotImplementedException();
+            return GetTile(tileInfo);
         }
 
         protected IReadOnlyDictionary<string, object> GetInfo()

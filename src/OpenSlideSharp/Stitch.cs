@@ -1,17 +1,18 @@
-﻿using ManagedCuda;
+﻿using AForge;
+using BruTile;
+using Gtk;
+using ManagedCuda;
+using ManagedCuda.BasicTypes;
+using ManagedCuda.VectorTypes;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using BruTile;
-using System.Runtime.InteropServices;
-using ManagedCuda.VectorTypes;
-using AForge;
-using ManagedCuda.BasicTypes;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
-using Gtk;
 namespace OpenSlideGTK
 {
     public class Stitch
@@ -37,6 +38,7 @@ namespace OpenSlideGTK
         public Stitch()
         {
             Initialize();
+            
         }
         public bool HasTile(Extent ex)
         {
@@ -51,22 +53,38 @@ namespace OpenSlideGTK
         {
             foreach (var item in gpuTiles)
             {
-                if (item.Item1.Index == t.Index)
+                if (item.Item1.Index == t.Index && item.Item1.Extent == t.Extent)
                     return true;
             }
             return false;
+        }
+        public void DisposeLevel(int lev)
+        {
+            foreach(var item in gpuTiles)
+            {
+                if(item.Item1.Index.Level == lev)
+                {
+                    item.Item2?.Dispose();
+                    gpuTiles.Remove(item);
+                }
+            }
         }
         public void AddTile(Tuple<TileInfo, byte[]> tile)
         {
             if (HasTile(tile.Item1))
                 return;
-            byte[] tileData = tile.Item2;
-            if (gpuTiles.Count > maxTiles)
+            byte[] tileData;
+            if (gpuTiles.Count > 0)
             {
-                var ti = gpuTiles.First();
-                ti.Item2.Dispose();
-                gpuTiles.Remove(gpuTiles.First());
+                for (int i = 0; i < gpuTiles.Count; i++)
+                {
+                    if(gpuTiles[i].Item1.Index.Level != tile.Item1.Index.Level)
+                    DisposeLevel(i);
+                }
+                tileData = tile.Item2;
             }
+            else
+                tileData = tile.Item2;
             try
             {
                 CudaDeviceVariable<byte> devTile = new CudaDeviceVariable<byte>(tileData.Length);
@@ -80,13 +98,34 @@ namespace OpenSlideGTK
             }
 
         }
-        public void Initialize()
+        public static List<string> Args = new List<string>();
+        public static void RestartApplication()
+        {
+            string exePath = Process.GetCurrentProcess().MainModule!.FileName!;
+            string args = Environment.CommandLine;
+
+            // Remove executable path from args
+            int firstSpace = args.IndexOf(' ');
+            if (firstSpace > 0)
+                args = args.Substring(firstSpace + 1);
+            else
+                args = string.Empty;
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = args,
+                UseShellExecute = true
+            });
+            Application.Quit();
+            Environment.Exit(0);
+        }
+        public string Initialize()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 OpenSlideBase.useGPU = false;
                 SlideSourceBase.useGPU = false;
-                return;
+                return "";
             }
             try
             {
@@ -94,13 +133,20 @@ namespace OpenSlideGTK
                 // Load the CUDA kernel
                 kernel = context.LoadKernelPTX(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/tile_copy.ptx", "copyTileToCanvas");
                 initialized = true;
+                return "";
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
+                if (e.Message.Contains("IllegalAddress"))
+                {
+                    RestartApplication();
+                    return "GPU IllegalAddress requires restart.";
+                }
+                return e.Message;
             }
-
         }
+       
         public static Bitmap ConvertCudaDeviceVariableToBitmap(CudaDeviceVariable<byte> deviceVar, int width, int height, PixelFormat pixelFormat)
         {
             // Step 1: Allocate a byte array on the CPU (host)
@@ -180,7 +226,7 @@ namespace OpenSlideGTK
                             int tileWidth = (int)Math.Ceiling(extent.MaxX - extent.MinX);
                             int tileHeight = (int)Math.Ceiling(extent.MaxY - extent.MinY);
 
-                            // canvasTileWidth and canvasTileHeight handle the scaling of the tile to the canvas
+                            // canvasTileWidth and canvasTileHeight handle the scaling of the tile to the canvas 
                             int canvasTileWidth = tileWidth;
                             int canvasTileHeight = tileHeight;
 
@@ -197,41 +243,74 @@ namespace OpenSlideGTK
                     byte[] stitchedImageData = new byte[canvasWidth * canvasHeight * 3]; // Assuming 3 channels (RGB)
                     devCanvas.CopyToHost(stitchedImageData);
 
-                    // Clip (x, y) to the canvas bounds
-                    int clippedX = Math.Max(0, (int)(x - minX));
-                    int clippedY = Math.Max(0, (int)(y - minY));
+                    // ========================================================================
+                    // FIX: Proper viewport extraction with bounds checking
+                    // ========================================================================
 
-                    // Make sure the viewport fits within the canvas bounds
-                    int viewportWidth = pxwidth;
-                    int viewportHeight = pxheight;
+                    // Calculate viewport position in canvas space
+                    int viewportX = (int)(x - minX);
+                    int viewportY = (int)(y - minY);
 
-                    // Extract the viewport region from the stitched image
-                    byte[] viewportImageData = new byte[viewportWidth * viewportHeight * 3]; // Assuming 3 channels
-                    System.Threading.Tasks.Parallel.For(0, viewportHeight, row =>
+                    // Clamp viewport to canvas bounds
+                    int clippedX = Math.Max(0, Math.Min(viewportX, canvasWidth));
+                    int clippedY = Math.Max(0, Math.Min(viewportY, canvasHeight));
+
+                    // Calculate how much of the viewport actually fits in the canvas
+                    int availableWidth = Math.Min(pxwidth, canvasWidth - clippedX);
+                    int availableHeight = Math.Min(pxheight, canvasHeight - clippedY);
+
+                    // Ensure we don't request negative or zero dimensions
+                    if (availableWidth <= 0 || availableHeight <= 0)
+                    {
+                        Console.WriteLine($"Viewport outside canvas bounds. Canvas: {canvasWidth}x{canvasHeight}, Viewport: ({viewportX},{viewportY}) {pxwidth}x{pxheight}");
+                        return new byte[pxwidth * pxheight * 3]; // Return black image
+                    }
+
+                    // Create viewport buffer (initialize to black)
+                    byte[] viewportImageData = new byte[pxwidth * pxheight * 3];
+
+                    // Copy only the available portion
+                    System.Threading.Tasks.Parallel.For(0, availableHeight, row =>
                     {
                         try
                         {
-                            int srcOffset = (clippedY + row) * canvasWidth * 3 + clippedX * 3;
-                            int dstOffset = row * viewportWidth * 3;
-                            Array.Copy(stitchedImageData, srcOffset, viewportImageData, dstOffset, viewportWidth * 3);
+                            int srcRow = clippedY + row;
+                            int dstRow = row;
+
+                            // Ensure we're within bounds
+                            if (srcRow >= 0 && srcRow < canvasHeight)
+                            {
+                                int srcOffset = srcRow * canvasWidth * 3 + clippedX * 3;
+                                int dstOffset = dstRow * pxwidth * 3;
+                                int bytesToCopy = availableWidth * 3;
+
+                                // Final safety check
+                                if (srcOffset >= 0 &&
+                                    srcOffset + bytesToCopy <= stitchedImageData.Length &&
+                                    dstOffset >= 0 &&
+                                    dstOffset + bytesToCopy <= viewportImageData.Length)
+                                {
+                                    Array.Copy(stitchedImageData, srcOffset, viewportImageData, dstOffset, bytesToCopy);
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("An error occurred while extracting the viewport: " + ex.Message);
+                            Console.WriteLine($"Error copying row {row}: {ex.Message}");
                         }
                     });
 
-                    return viewportImageData; // Return the extracted viewport
+                    return viewportImageData;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error occurred: " + ex.Message);
+                Console.WriteLine($"StitchImages error: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 Initialize(); // Reinitialize in case of errors
                 return null;
             }
         }
-
     }
 
 }
