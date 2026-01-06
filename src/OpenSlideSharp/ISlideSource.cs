@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using static OpenSlideGTK.OpenSlideImage;
 using PixelFormat = AForge.PixelFormat;
 namespace OpenSlideGTK
 {
@@ -133,7 +134,7 @@ namespace OpenSlideGTK
             return tile;
         }
 
-        private void AddTile(Info tileId, byte[] tile)
+        public void AddTile(Info tileId, byte[] tile)
         {
             cache.Add(tileId, tile);
         }
@@ -226,6 +227,8 @@ namespace OpenSlideGTK
         public static bool useGPU = true;
         public Stitch stitch = new Stitch();
         private PixelFormat px;
+        public AForge.Size PyramidalSize;
+        public PointD PyramidalOrigin;
         public PixelFormat PixelFormat
         {
             get { return px; }
@@ -259,6 +262,123 @@ namespace OpenSlideGTK
             return swappedData;
         }
 
+        private int GetOptimalBatchSize()
+        {
+            
+            // Small viewport (< 800x600): fetch all tiles at once
+            if (PyramidalSize.Width < 800 && PyramidalSize.Height < 600)
+                return 100;
+
+            // Medium viewport (< 1920x1080): moderate batching
+            if (PyramidalSize.Width < 1920 && PyramidalSize.Height < 1080)
+                return 50;
+
+            // Large viewport (fullscreen): aggressive batching
+            // Process visible center tiles first, then outer tiles
+            return 25;
+        }
+
+        private async Task<byte[]> FetchSingleTileAsync(TileInfo tile, int level)
+        {
+            // Your existing tile fetch logic here
+            // This should use the cache and only fetch if not cached
+            try
+            {
+                byte[] tileData = this.GetTile(tile);
+                // Process tile data...
+                return tileData;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching tile: {ex.Message}");
+            }
+            return null;
+        }
+
+        // ============================================================================
+        // OPTIMIZATION 4: Smarter pyramid level selection
+        // ============================================================================
+
+        private int GetOptimalPyramidLevel(double resolution, IDictionary<int,Resolution> ress)
+        {
+            // This should use your existing TileUtil.GetLevel() logic
+            // but with awareness of viewport size
+            // For small viewports, can use higher detail levels
+            // For large viewports, might need to drop to lower detail to maintain performance
+            level = TileUtil.GetLevel(ress, resolution);
+            // Adaptive level adjustment based on viewport size
+            if (PyramidalSize.Width > 2560 || PyramidalSize.Height > 1440)
+            {
+                // 4K or larger - consider dropping one level for performance
+                level = Math.Min(level + 1, ress.Count - 1);
+            }      
+            return level;
+        }
+
+        /// <summary>
+        /// Fetches tiles in priority order: center viewport first, then edges.
+        /// Ensures visible content appears before prefetch content.
+        /// </summary>
+        public async Task FetchTilesAsync(List<BruTile.TileInfo> tiles, int level, ZCT coordinate)
+        {
+            if (tiles == null || tiles.Count == 0)
+                return;
+
+            // --------------------------------------------------------------------
+            // 1. Calculate viewport center (base-resolution coordinates)
+            // --------------------------------------------------------------------
+            double centerX = PyramidalOrigin.X + (PyramidalSize.Width * 0.5);
+            double centerY = PyramidalOrigin.Y + (PyramidalSize.Height * 0.5);
+
+            // --------------------------------------------------------------------
+            // 2. Sort tiles by squared distance (avoid sqrt)
+            // --------------------------------------------------------------------
+            var prioritizedTiles = tiles
+                .OrderBy(tile =>
+                {
+                    double dx = tile.Extent.CenterX - centerX;
+                    double dy = tile.Extent.CenterY - centerY;
+                    return (dx * dx) + (dy * dy);
+                })
+                .ToList();
+
+            // --------------------------------------------------------------------
+            // 3. Fetch tiles in batches
+            // --------------------------------------------------------------------
+            int batchSize = GetOptimalBatchSize();
+
+            for (int i = 0; i < prioritizedTiles.Count; i += batchSize)
+            {
+                var batch = prioritizedTiles.Skip(i).Take(batchSize).ToList();
+
+                // Parallel fetch within batch
+                byte[][] results = await Task.WhenAll(
+                    batch.Select(tile => FetchSingleTileAsync(tile, level))
+                );
+
+                // ----------------------------------------------------------------
+                // 4. Insert into appropriate cache
+                // ----------------------------------------------------------------
+                for (int j = 0; j < batch.Count; j++)
+                {
+                    var tile = batch[j];
+                    var data = results[j];
+
+                    if (data == null)
+                        continue;
+                        var info = new Info(
+                            coordinate,
+                            tile.Index,
+                            this.Schema.Extent,
+                            level
+                        );
+                    Info tf = new Info(coord, tile.Index, tile.Extent, level);
+                    cache.AddTile(tf, data);
+                }
+            }
+        }
+
+
         public void SetSliceInfo(int level,PixelFormat px,ZCT coord)
         {
             this.px = px;
@@ -269,14 +389,16 @@ namespace OpenSlideGTK
         {
             if (stitch == null)
                 stitch = new Stitch();
+            if(cache == null)
+                cache = new TileCache(this, 200);
             var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
-
+            await this.FetchTilesAsync(tileInfos.ToList(), this.level, coord);
             foreach (BruTile.TileInfo t in tileInfos)
             {
-                byte[] c = await this.GetTileAsync(t);
+                byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level), curUnitsPerPixel);
                 if (c != null)
                 {
                     if (c.Length == 4 * 256 * 256)
@@ -424,6 +546,7 @@ namespace OpenSlideGTK
         public IReadOnlyDictionary<string, object> ExternInfo { get; protected set; }
 
         public string Source { get; protected set; }
+        public TileCache cache;
 
         public abstract IReadOnlyDictionary<string, byte[]> GetExternImages();
 

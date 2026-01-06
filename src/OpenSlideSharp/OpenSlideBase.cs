@@ -148,6 +148,8 @@ namespace OpenSlideGTK
 
         #region IDisposable
         private bool disposedValue;
+        public TileCache cache;
+
         protected override void Dispose(bool disposing)
         {
             if (!disposedValue)

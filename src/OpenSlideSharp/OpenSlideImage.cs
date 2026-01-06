@@ -1,10 +1,13 @@
-﻿using OpenSlideGTK.Interop;
+﻿using AForge;
+using BruTile;
+using OpenSlideGTK.Interop;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace OpenSlideGTK
 {
@@ -54,6 +57,136 @@ namespace OpenSlideGTK
             Handle = handle;
             disposedValue = !isOwner;
             CheckIfThrow(0, isOwner);
+        }
+
+        public class LruCache<TileInformation, TValue>
+        {
+            public class Info
+            {
+                public ZCT Coordinate { get; set; }
+                public TileIndex Index { get; set; }
+            }
+            private readonly int capacity = 200;
+            private Dictionary<Info, LinkedListNode<(Info key, TValue value)>> cacheMap = new Dictionary<Info, LinkedListNode<(Info key, TValue value)>>();
+            private LinkedList<(Info key, TValue value)> lruList = new LinkedList<(Info key, TValue value)>();
+
+            public LruCache(int capacity)
+            {
+                this.capacity = capacity;
+            }
+
+            public TValue Get(Info key)
+            {
+                foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+                {
+                    Info k = item.Value.key;
+                    if (k.Coordinate == key.Coordinate && k.Index == key.Index)
+                    {
+                        lruList.Remove(item);
+                        lruList.AddLast(item);
+                        return item.Value.value;
+                    }
+                }
+                return default(TValue);
+            }
+
+            public void Add(Info key, TValue value)
+            {
+                if (cacheMap.Count >= capacity)
+                {
+                    var oldest = lruList.First;
+                    if (oldest != null)
+                    {
+                        lruList.RemoveFirst();
+                        cacheMap.Remove(oldest.Value.key);
+                    }
+                }
+
+                if (cacheMap.ContainsKey(key))
+                {
+                    lruList.Remove(cacheMap[key]);
+                }
+
+                var newNode = new LinkedListNode<(Info key, TValue value)>((key, value));
+                lruList.AddLast(newNode);
+                cacheMap[key] = newNode;
+            }
+            public void Dispose()
+            {
+                foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+                {
+                    lruList.Remove(item);
+                }
+            }
+        }
+        public class TileInformation
+        {
+            public TileInformation(TileIndex index, Extent ext, ZCT coord)
+            {
+                Index = index;
+                Extent = ext;
+                Coordinate = coord;
+            }
+            public TileIndex Index { get; set; }
+            public Extent Extent { get; set; }
+            public ZCT Coordinate { get; set; }
+        }
+        public class TileCache
+        {
+            private LruCache<TileInformation, byte[]> cache;
+            private int capacity;
+            SlideSourceBase source = null;
+            public TileCache(SlideSourceBase source, int capacity = 200)
+            {
+                this.source = source;
+                this.capacity = capacity;
+                this.cache = new LruCache<TileInformation, byte[]>(capacity);
+            }
+
+            public async Task<byte[]> GetTile(TileInformation info)
+            {
+                LruCache<TileInformation, byte[]>.Info inf = new LruCache<TileInformation, byte[]>.Info();
+                inf.Coordinate = info.Coordinate;
+                inf.Index = info.Index;
+                byte[] data = cache.Get(inf);
+                if (data != null)
+                {
+                    return data;
+                }
+                byte[] tile = await LoadTile(info);
+                if (tile != null)
+                    AddTile(info, tile);
+                return tile;
+            }
+
+            public void AddTile(TileInformation tileId, byte[] tile)
+            {
+                LruCache<TileInformation, byte[]>.Info inf = new LruCache<TileInformation, byte[]>.Info();
+                inf.Coordinate = tileId.Coordinate;
+                inf.Index = tileId.Index;
+                cache.Add(inf, tile);
+            }
+
+            private async Task<byte[]> LoadTile(TileInformation tileId)
+            {
+                try
+                {
+                    TileInfo tf = new TileInfo()
+                    {
+                        Index = tileId.Index,
+                        Extent = tileId.Extent,
+                    };
+                    return await source.GetTileAsync(tf);
+                }
+                catch (Exception e)
+                {
+                    return null;
+                }
+            }
+            public void Dispose()
+            {
+                cache.Dispose();
+            }
         }
 
         /// <summary>
