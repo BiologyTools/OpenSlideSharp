@@ -434,7 +434,7 @@ namespace OpenSlideGTK
             var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
             destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
             sourceExtent = srcPixelExtent;
-            if (useGPU)
+            if (useGPU && stitch.gpuTiles.Count > 0)
             {
                 try
                 {
@@ -489,7 +489,6 @@ namespace OpenSlideGTK
             catch (Exception er)
             {
                 Console.WriteLine(er.Message);
-                return null;
             }
             return null;
         }

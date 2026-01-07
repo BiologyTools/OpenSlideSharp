@@ -53,7 +53,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\..\..\AForgeBio\AForgeBio\AForgeBio.csproj" />
+    <ProjectReference Include="..\..\..\AForgeBio\AForgeBio.csproj" />
   </ItemGroup>
   
 </Project>
