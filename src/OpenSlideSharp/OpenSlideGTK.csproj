@@ -46,14 +46,14 @@
   
   <ItemGroup>
     <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
-    <PackageReference Include="Mapsui" Version="5.0.1" />
-    <PackageReference Include="Mapsui.Tiling" Version="5.0.1" />
-    <PackageReference Include="NetVips" Version="3.1.0" />
+    <PackageReference Include="Mapsui" Version="5.0.2" />
+    <PackageReference Include="Mapsui.Tiling" Version="5.0.2" />
+    <PackageReference Include="NetVips" Version="3.2.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\..\..\AForgeBio\AForgeBio.csproj" />
+    <ProjectReference Include="..\..\..\AForgeBio\AForgeBio\AForgeBio.csproj" />
   </ItemGroup>
   
 </Project>

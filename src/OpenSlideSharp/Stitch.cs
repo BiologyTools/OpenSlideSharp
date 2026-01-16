@@ -143,6 +143,8 @@ namespace OpenSlideGTK
                     RestartApplication();
                     return "GPU IllegalAddress requires restart.";
                 }
+                OpenSlideBase.useGPU = false;
+                SlideSourceBase.useGPU = false;
                 return e.Message;
             }
         }
@@ -174,6 +176,8 @@ namespace OpenSlideGTK
         {
             try
             {
+                if (gpuTiles.Count == 0)
+                    return null;
                 // Convert world coordinates of tile extents to pixel space based on resolution
                 foreach (var item in tiles)
                 {
