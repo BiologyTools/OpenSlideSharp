@@ -49,6 +49,7 @@
     <PackageReference Include="Mapsui" Version="5.0.2" />
     <PackageReference Include="Mapsui.Tiling" Version="5.0.2" />
     <PackageReference Include="NetVips" Version="3.2.0" />
+    <PackageReference Include="OpenTK" Version="4.9.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
   

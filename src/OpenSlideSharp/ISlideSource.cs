@@ -420,8 +420,9 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(Tuple.Create(tileInfo, c));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight), sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight,c);
                         tiles.Add(Tuple.Create(tileInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
+
                     }
                     else
                         tiles.Add(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
@@ -465,30 +466,6 @@ namespace OpenSlideGTK
                     Console.WriteLine("Failed to use LibVips please install Libvips for your platform.");
                     Console.WriteLine(e.Message);
                 }
-            }
-            try
-            {
-                
-                if (px == PixelFormat.Format16bppGrayScale)
-                {
-                    SixLabors.ImageSharp.Image im = ImageUtil.Join16(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
-                    byte[] bts = Get16Bytes((Image<L16>)im);
-                    if (im != null)
-                        im.Dispose();
-                    return bts;
-                }
-                else if (px == PixelFormat.Format24bppRgb)
-                {
-                    SixLabors.ImageSharp.Image im = ImageUtil.JoinRGB24(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
-                    byte[] bts = GetRgb24Bytes((Image<Rgb24>)im);
-                    if(im!=null)
-                    im.Dispose();
-                    return bts;
-                }
-            }
-            catch (Exception er)
-            {
-                Console.WriteLine(er.Message);
             }
             return null;
         }

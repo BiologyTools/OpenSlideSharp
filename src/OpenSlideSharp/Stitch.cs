@@ -4,6 +4,7 @@ using Gtk;
 using ManagedCuda;
 using ManagedCuda.BasicTypes;
 using ManagedCuda.VectorTypes;
+using Pango;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
@@ -13,308 +14,498 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using static OpenSlideGTK.Stitch;
+using AForge.Math.Geometry;
+using BruTile;
+using OpenTK.Graphics.OpenGL;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using PixelFormat = OpenTK.Graphics.OpenGL.PixelFormat;
 namespace OpenSlideGTK
 {
     public class Stitch
     {
-        [StructLayout(LayoutKind.Sequential)]
-        public struct TileData
-        {
-            public Extent Extent;        // Struct representing the Extent
-            public CUdeviceptr DevTilePtr; // CUDA device pointer to the tile data
-
-            public TileData(Extent extent, CUdeviceptr devTilePtr)
-            {
-                this.Extent = extent;
-                this.DevTilePtr = devTilePtr;
-            }
-        }
-        // Initialize CUDA context
-        private const int maxTiles = 100;
-        private CudaContext context;
-        public List<Tuple<TileInfo, CudaDeviceVariable<byte>>> gpuTiles = new List<Tuple<TileInfo, CudaDeviceVariable<byte>>>();
-        private CudaKernel kernel;
+        private OpenGLStitcher stitcher;
+        private TileTextureCache textureCache;
         private bool initialized = false;
+
+        public List<GpuTile> gpuTiles = new();
+
         public Stitch()
         {
-            Initialize();
-            
+            Initialize(new AForge.PointD(255, 255));
         }
-        public bool HasTile(Extent ex)
+
+        // Public tile query methods
+        public bool HasTile(TileIndex ex)
         {
-            foreach (var item in gpuTiles)
-            {
-                if (item.Item1.Extent == ex)
-                    return true;
-            }
-            return false;
+            return gpuTiles.Any(item => item.Index == ex);
         }
+
         public bool HasTile(TileInfo t)
         {
-            foreach (var item in gpuTiles)
-            {
-                if (item.Item1.Index == t.Index && item.Item1.Extent == t.Extent)
-                    return true;
-            }
-            return false;
+            return gpuTiles.Any(item => item.Index == t.Index && item.Extent == t.Extent);
         }
-        public void DisposeLevel(int lev)
+
+        public bool HasTile(Extent t)
         {
-            foreach(var item in gpuTiles)
+            return gpuTiles.Any(item => item.Extent == t);
+        }
+
+        // Tile management operations
+        public void DisposeLevel(int level)
+        {
+            var tilesToRemove = gpuTiles.Where(item => item.Index.Level == level).ToList();
+            foreach (var tile in tilesToRemove)
             {
-                if(item.Item1.Index.Level == lev)
-                {
-                    item.Item2?.Dispose();
-                    gpuTiles.Remove(item);
-                }
+                textureCache?.ReleaseTexture(tile.Index);
+                gpuTiles.Remove(tile);
             }
         }
-        public void AddTile(Tuple<TileInfo, byte[]> tile)
+
+        public void AddTile(GpuTile tileInfo, int width, int height, byte[] pixelData)
         {
-            if (HasTile(tile.Item1))
+            if (HasTile(tileInfo))
                 return;
-            byte[] tileData;
-            if (gpuTiles.Count > 0)
+
+            var gpuTile = new GpuTile(tileInfo, pixelData, width, height);
+            gpuTiles.Add(gpuTile);
+
+            if (initialized && textureCache != null)
             {
-                for (int i = 0; i < gpuTiles.Count; i++)
-                {
-                    if(gpuTiles[i].Item1.Index.Level != tile.Item1.Index.Level)
-                    DisposeLevel(i);
-                }
-                tileData = tile.Item2;
+                textureCache.UploadTexture(tileInfo.Index, pixelData, width, height);
             }
-            else
-                tileData = tile.Item2;
+        }
+
+        // Initialization
+        public string Initialize(AForge.PointD size)
+        {
             try
             {
-                CudaDeviceVariable<byte> devTile = new CudaDeviceVariable<byte>(tileData.Length);
-                devTile.CopyToDevice(tileData);
-                gpuTiles.Add(new Tuple<TileInfo, CudaDeviceVariable<byte>>(tile.Item1, devTile));
-            }
-            catch (Exception e)
-            {
-                Initialize();
-                Console.WriteLine(e.Message);
-            }
-
-        }
-        public static List<string> Args = new List<string>();
-        public static void RestartApplication()
-        {
-            string exePath = Process.GetCurrentProcess().MainModule!.FileName!;
-            string args = Environment.CommandLine;
-
-            // Remove executable path from args
-            int firstSpace = args.IndexOf(' ');
-            if (firstSpace > 0)
-                args = args.Substring(firstSpace + 1);
-            else
-                args = string.Empty;
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = exePath,
-                Arguments = args,
-                UseShellExecute = true
-            });
-            Application.Quit();
-            Environment.Exit(0);
-        }
-        public string Initialize()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                OpenSlideBase.useGPU = false;
-                SlideSourceBase.useGPU = false;
-                return "";
-            }
-            try
-            {
-                context = new CudaContext();
-                // Load the CUDA kernel
-                kernel = context.LoadKernelPTX(System.IO.Path.GetDirectoryName(Environment.ProcessPath) + "/tile_copy.ptx", "copyTileToCanvas");
+                textureCache = new TileTextureCache();
+                stitcher = new OpenGLStitcher();
                 initialized = true;
                 return "";
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
-                if (e.Message.Contains("IllegalAddress"))
-                {
-                    RestartApplication();
-                    return "GPU IllegalAddress requires restart.";
-                }
-                OpenSlideBase.useGPU = false;
-                SlideSourceBase.useGPU = false;
+                Console.WriteLine($"OpenGL initialization error: {e.Message}");
                 return e.Message;
             }
         }
-       
-        public static Bitmap ConvertCudaDeviceVariableToBitmap(CudaDeviceVariable<byte> deviceVar, int width, int height, PixelFormat pixelFormat)
+
+        // Main stitching operation
+        public byte[] StitchImages(
+            List<TileInfo> tiles,
+            int pxwidth,
+            int pxheight,
+            double viewX,
+            double viewY,
+            double viewResolution)
         {
-            // Step 1: Allocate a byte array on the CPU (host)
-            byte[] hostArray = new byte[deviceVar.Size];
+            if (!initialized)
+            {
+                Initialize(new AForge.PointD(pxwidth, pxheight));
+            }
 
-            // Step 2: Copy the data from the GPU (device) to the CPU (host)
-            deviceVar.CopyToHost(hostArray);
-
-            // Step 3: Create a Bitmap object from the byte array
-            Bitmap bitmap = new Bitmap(width, height, pixelFormat);
-
-            // Step 4: Lock the bitmap's bits for writing
-            BitmapData bmpData = bitmap.LockBits(new AForge.Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, pixelFormat);
-
-            // Step 5: Copy the byte array to the bitmap's pixel buffer
-            System.Runtime.InteropServices.Marshal.Copy(hostArray, 0, bmpData.Scan0, hostArray.Length);
-
-            // Step 6: Unlock the bitmap's bits
-            bitmap.UnlockBits(bmpData);
-
-            // Return the Bitmap object
-            return bitmap;
-        }
-        public byte[] StitchImages(List<TileInfo> tiles, int pxwidth, int pxheight, double x, double y, double resolution)
-        {
             try
             {
-                if (gpuTiles.Count == 0)
-                    return null;
-                // Convert world coordinates of tile extents to pixel space based on resolution
-                foreach (var item in tiles)
+                if(stitcher == null)
                 {
-                    item.Extent = item.Extent.WorldToPixelInvertedY(resolution);
+                    stitcher = new OpenGLStitcher();
                 }
-
-                if (!initialized)
-                {
-                    Initialize();
-                }
-
-                // Calculate the bounding box (min/max extents) of the stitched image
-                double maxX = tiles.Max(t => t.Extent.MaxX);
-                double maxY = tiles.Max(t => t.Extent.MaxY);
-                double minX = tiles.Min(t => t.Extent.MinX);
-                double minY = tiles.Min(t => t.Extent.MinY);
-
-                // Calculate canvas size in pixels
-                int canvasWidth = (int)(maxX - minX);
-                int canvasHeight = (int)(maxY - minY);
-
-                // Allocate memory for the output stitched image on the GPU
-                using (CudaDeviceVariable<byte> devCanvas = new CudaDeviceVariable<byte>(canvasWidth * canvasHeight * 3)) // 3 channels for RGB
-                {
-                    // Set block and grid sizes for kernel launch
-                    dim3 blockSize = new dim3(16, 16, 1);
-                    dim3 gridSize = new dim3((uint)((canvasWidth + blockSize.x - 1) / blockSize.x), (uint)((canvasHeight + blockSize.y - 1) / blockSize.y), 1);
-
-                    // Iterate through each tile and copy it to the GPU canvas
-                    foreach (var tile in tiles)
-                    {
-                        Extent extent = tile.Extent;
-
-                        // Find the corresponding GPU tile (already loaded into GPU memory)
-                        CudaDeviceVariable<byte> devTile = null;
-                        foreach (var t in gpuTiles)
-                        {
-                            if (t.Item1.Index == tile.Index)
-                            {
-                                devTile = t.Item2;
-                                break;
-                            }
-                        }
-
-                        if (devTile != null)
-                        {
-                            // Calculate the start position on the canvas and the dimensions of the tile
-                            int startX = (int)Math.Ceiling(extent.MinX - minX);
-                            int startY = (int)Math.Ceiling(extent.MinY - minY);
-                            int tileWidth = (int)Math.Ceiling(extent.MaxX - extent.MinX);
-                            int tileHeight = (int)Math.Ceiling(extent.MaxY - extent.MinY);
-
-                            // canvasTileWidth and canvasTileHeight handle the scaling of the tile to the canvas 
-                            int canvasTileWidth = tileWidth;
-                            int canvasTileHeight = tileHeight;
-
-                            // Run the CUDA kernel to copy the tile to the canvas
-                            kernel.BlockDimensions = blockSize;
-                            kernel.GridDimensions = gridSize;
-
-                            // Run the kernel, including scaling factors
-                            kernel.Run(devCanvas.DevicePointer, canvasWidth, canvasHeight, devTile.DevicePointer, 256, 256, startX, startY, canvasTileWidth, canvasTileHeight);
-                        }
-                    }
-
-                    // Download the stitched image from the GPU to the host (CPU)
-                    byte[] stitchedImageData = new byte[canvasWidth * canvasHeight * 3]; // Assuming 3 channels (RGB)
-                    devCanvas.CopyToHost(stitchedImageData);
-
-                    // ========================================================================
-                    // FIX: Proper viewport extraction with bounds checking
-                    // ========================================================================
-
-                    // Calculate viewport position in canvas space
-                    int viewportX = (int)(x - minX);
-                    int viewportY = (int)(y - minY);
-
-                    // Clamp viewport to canvas bounds
-                    int clippedX = Math.Max(0, Math.Min(viewportX, canvasWidth));
-                    int clippedY = Math.Max(0, Math.Min(viewportY, canvasHeight));
-
-                    // Calculate how much of the viewport actually fits in the canvas
-                    int availableWidth = Math.Min(pxwidth, canvasWidth - clippedX);
-                    int availableHeight = Math.Min(pxheight, canvasHeight - clippedY);
-
-                    // Ensure we don't request negative or zero dimensions
-                    if (availableWidth <= 0 || availableHeight <= 0)
-                    {
-                        Console.WriteLine($"Viewport outside canvas bounds. Canvas: {canvasWidth}x{canvasHeight}, Viewport: ({viewportX},{viewportY}) {pxwidth}x{pxheight}");
-                        return new byte[pxwidth * pxheight * 3]; // Return black image
-                    }
-
-                    // Create viewport buffer (initialize to black)
-                    byte[] viewportImageData = new byte[pxwidth * pxheight * 3];
-
-                    // Copy only the available portion
-                    System.Threading.Tasks.Parallel.For(0, availableHeight, row =>
-                    {
-                        try
-                        {
-                            int srcRow = clippedY + row;
-                            int dstRow = row;
-
-                            // Ensure we're within bounds
-                            if (srcRow >= 0 && srcRow < canvasHeight)
-                            {
-                                int srcOffset = srcRow * canvasWidth * 3 + clippedX * 3;
-                                int dstOffset = dstRow * pxwidth * 3;
-                                int bytesToCopy = availableWidth * 3;
-
-                                // Final safety check
-                                if (srcOffset >= 0 &&
-                                    srcOffset + bytesToCopy <= stitchedImageData.Length &&
-                                    dstOffset >= 0 &&
-                                    dstOffset + bytesToCopy <= viewportImageData.Length)
-                                {
-                                    Array.Copy(stitchedImageData, srcOffset, viewportImageData, dstOffset, bytesToCopy);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error copying row {row}: {ex.Message}");
-                        }
-                    });
-
-                    return viewportImageData;
-                }
+                return stitcher.Render(
+                    tiles,
+                    gpuTiles,
+                    textureCache,
+                    pxwidth,
+                    pxheight,
+                    viewX,
+                    viewY,
+                    viewResolution);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"StitchImages error: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                Initialize(); // Reinitialize in case of errors
-                return null;
+                Console.WriteLine($"Stitching error: {ex.Message}");
+                throw;
+            }
+        }
+
+        // GPU tile data structure
+        public sealed class GpuTile : TileInfo
+        {
+            public TileIndex Index;
+            public int Width;
+            public int Height;
+            public byte[] Bytes;
+
+            public GpuTile(TileInfo tf, byte[] bts, int pxwidth, int pxheight)
+            {
+                Index = tf.Index;
+                Width = pxwidth;
+                Height = pxheight;
+                Bytes = bts;
+            }
+
+            public void Dispose()
+            {
+                Bytes = null;
             }
         }
     }
 
+    // OpenGL rendering implementation
+    internal class OpenGLStitcher
+    {
+        private ShaderProgram shaderProgram;
+        private int framebuffer;
+        private int renderbuffer;
+        private int vao;
+        private int vbo;
+
+        private int currentFboWidth = -1;
+        private int currentFboHeight = -1;
+
+        public OpenGLStitcher()
+        {
+            InitializeOpenGL();
+        }
+
+        private void InitializeOpenGL()
+        {
+            // Compile shaders
+            shaderProgram = new ShaderProgram(VertexShaderSource, FragmentShaderSource);
+
+            // Create vertex array and buffer for quad
+            CreateQuadGeometry();
+
+            // Create framebuffer (will be resized on demand)
+            GL.GenFramebuffers(1, out framebuffer);
+            GL.GenRenderbuffers(1, out renderbuffer);
+        }
+
+        private void CreateQuadGeometry()
+        {
+            // Full-screen quad with texture coordinates
+            float[] quadVertices = {
+            // Position (x, y)  TexCoord (u, v)
+            -1.0f, -1.0f,       0.0f, 0.0f,
+                1.0f, -1.0f,       1.0f, 0.0f,
+                1.0f,  1.0f,       1.0f, 1.0f,
+
+            -1.0f, -1.0f,       0.0f, 0.0f,
+                1.0f,  1.0f,       1.0f, 1.0f,
+            -1.0f,  1.0f,       0.0f, 1.0f
+        };
+
+            GL.GenVertexArrays(1, out vao);
+            GL.GenBuffers(1, out vbo);
+
+            GL.BindVertexArray(vao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, quadVertices.Length * sizeof(float),
+                quadVertices, BufferUsageHint.StaticDraw);
+
+            // Position attribute
+            GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            // TexCoord attribute
+            GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 2 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            GL.BindVertexArray(0);
+        }
+
+        private void EnsureFramebufferSize(int width, int height)
+        {
+            if (currentFboWidth == width && currentFboHeight == height)
+                return;
+
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+
+            // Setup renderbuffer for color attachment
+            GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, renderbuffer);
+            GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer,
+                RenderbufferStorage.Rgba8, width, height);
+            GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer,
+                FramebufferAttachment.ColorAttachment0,
+                RenderbufferTarget.Renderbuffer, renderbuffer);
+
+            var status = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            if (status != FramebufferErrorCode.FramebufferComplete)
+            {
+                throw new Exception($"Framebuffer incomplete: {status}");
+            }
+
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+            currentFboWidth = width;
+            currentFboHeight = height;
+        }
+
+        public byte[] Render(
+            List<TileInfo> tiles,
+            List<Stitch.GpuTile> gpuTiles,
+            TileTextureCache textureCache,
+            int pxwidth,
+            int pxheight,
+            double viewX,
+            double viewY,
+            double viewResolution)
+        {
+            // Ensure framebuffer matches viewport size
+            EnsureFramebufferSize(pxwidth, pxheight);
+
+            // Bind framebuffer and clear
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            GL.Viewport(0, 0, pxwidth, pxheight);
+            GL.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            GL.Clear(ClearBufferMask.ColorBufferBit);
+
+            // Enable blending for proper compositing
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+            // Use shader program
+            shaderProgram.Use();
+            GL.BindVertexArray(vao);
+
+            // Render each tile
+            foreach (var tile in tiles)
+            {
+                RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight,
+                    viewX, viewY, viewResolution);
+            }
+
+            // Read back pixels
+            byte[] viewportData = new byte[pxwidth * pxheight * 4];
+            GL.ReadPixels(0, 0, pxwidth, pxheight,
+                PixelFormat.Rgba, PixelType.UnsignedByte, viewportData);
+
+            // Cleanup
+            GL.BindVertexArray(0);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            GL.Disable(EnableCap.Blend);
+
+            return viewportData;
+        }
+
+        private void RenderTile(
+            TileInfo tile,
+            List<Stitch.GpuTile> gpuTiles,
+            TileTextureCache textureCache,
+            int pxwidth,
+            int pxheight,
+            double viewX,
+            double viewY,
+            double viewResolution)
+        {
+            // Find matching GPU tile
+            var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
+            if (gpuTile == null)
+                return;
+
+            // Get texture from cache
+            int textureId = textureCache.GetTexture(tile.Index);
+            if (textureId == 0)
+                return;
+
+            // Calculate tile position in viewport
+            int tileWidth = gpuTile.Width;
+            int tileHeight = gpuTile.Height;
+            int levelScale = 1 << tile.Index.Level;
+
+            var extentPx = tile.Extent.WorldToPixelInvertedY(viewResolution);
+
+            int offsetX = (int)Math.Floor(extentPx.MinX - viewX);
+            int offsetY = pxheight - (int)Math.Floor(extentPx.MaxY - viewY) - tileHeight * levelScale;
+
+            int scaledWidth = tileWidth * levelScale;
+            int scaledHeight = tileHeight * levelScale;
+
+            // Convert to normalized device coordinates (-1 to 1)
+            float ndcX = (offsetX / (float)pxwidth) * 2.0f - 1.0f;
+            float ndcY = (offsetY / (float)pxheight) * 2.0f - 1.0f;
+            float ndcWidth = (scaledWidth / (float)pxwidth) * 2.0f;
+            float ndcHeight = (scaledHeight / (float)pxheight) * 2.0f;
+
+            // Set uniforms
+            shaderProgram.SetUniform("tileTexture", 0);
+            shaderProgram.SetUniform("position", ndcX, ndcY);
+            shaderProgram.SetUniform("size", ndcWidth, ndcHeight);
+
+            // Bind texture and draw
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.Texture2D, textureId);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+        }
+
+        // Shader sources
+        private const string VertexShaderSource = @"
+#version 330 core
+layout (location = 0) in vec2 aPosition;
+layout (location = 1) in vec2 aTexCoord;
+
+uniform vec2 position;
+uniform vec2 size;
+
+out vec2 TexCoord;
+
+void main()
+{
+vec2 scaledPos = aPosition * size * 0.5 + position + size * 0.5;
+gl_Position = vec4(scaledPos, 0.0, 1.0);
+TexCoord = aTexCoord;
+}
+";
+
+        private const string FragmentShaderSource = @"
+#version 330 core
+in vec2 TexCoord;
+out vec4 FragColor;
+
+uniform sampler2D tileTexture;
+
+void main()
+{
+FragColor = texture(tileTexture, TexCoord);
+}
+";
+    }
+
+    // Texture cache management
+    internal class TileTextureCache
+    {
+        private Dictionary<TileIndex, int> textureCache = new();
+
+        public void UploadTexture(TileIndex index, byte[] pixelData, int width, int height)
+        {
+            if (textureCache.ContainsKey(index))
+                return;
+
+            int textureId;
+            GL.GenTextures(1, out textureId);
+            GL.BindTexture(TextureTarget.Texture2D, textureId);
+
+            // Upload pixel data
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8,
+                width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixelData);
+
+            // Set texture parameters
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
+                (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter,
+                (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS,
+                (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,
+                (int)TextureWrapMode.ClampToEdge);
+
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+
+            textureCache[index] = textureId;
+        }
+
+        public int GetTexture(TileIndex index)
+        {
+            return textureCache.TryGetValue(index, out int textureId) ? textureId : 0;
+        }
+
+        public void ReleaseTexture(TileIndex index)
+        {
+            if (textureCache.TryGetValue(index, out int textureId))
+            {
+                GL.DeleteTexture(textureId);
+                textureCache.Remove(index);
+            }
+        }
+
+        public void Clear()
+        {
+            foreach (var textureId in textureCache.Values)
+            {
+                GL.DeleteTexture(textureId);
+            }
+            textureCache.Clear();
+        }
+    }
+
+    // Shader program wrapper
+    internal class ShaderProgram
+    {
+        private int programId;
+        private Dictionary<string, int> uniformLocations = new();
+
+        public ShaderProgram(string vertexSource, string fragmentSource)
+        {
+            int vertexShader = CompileShader(ShaderType.VertexShader, vertexSource);
+            int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentSource);
+
+            programId = GL.CreateProgram();
+            GL.AttachShader(programId, vertexShader);
+            GL.AttachShader(programId, fragmentShader);
+            GL.LinkProgram(programId);
+
+            CheckProgramLinkStatus();
+
+            GL.DeleteShader(vertexShader);
+            GL.DeleteShader(fragmentShader);
+        }
+
+        private int CompileShader(ShaderType type, string source)
+        {
+            int shader = GL.CreateShader(type);
+            GL.ShaderSource(shader, source);
+            GL.CompileShader(shader);
+
+            GL.GetShader(shader, ShaderParameter.CompileStatus, out int success);
+            if (success == 0)
+            {
+                string infoLog = GL.GetShaderInfoLog(shader);
+                throw new Exception($"Shader compilation failed ({type}): {infoLog}");
+            }
+
+            return shader;
+        }
+
+        private void CheckProgramLinkStatus()
+        {
+            GL.GetProgram(programId, GetProgramParameterName.LinkStatus, out int success);
+            if (success == 0)
+            {
+                string infoLog = GL.GetProgramInfoLog(programId);
+                throw new Exception($"Program linking failed: {infoLog}");
+            }
+        }
+
+        public void Use()
+        {
+            GL.UseProgram(programId);
+        }
+
+        public void SetUniform(string name, int value)
+        {
+            int location = GetUniformLocation(name);
+            GL.Uniform1(location, value);
+        }
+
+        public void SetUniform(string name, float x, float y)
+        {
+            int location = GetUniformLocation(name);
+            GL.Uniform2(location, x, y);
+        }
+
+        private int GetUniformLocation(string name)
+        {
+            if (!uniformLocations.TryGetValue(name, out int location))
+            {
+                location = GL.GetUniformLocation(programId, name);
+                uniformLocations[name] = location;
+            }
+            return location;
+        }
+    }
 }
