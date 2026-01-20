@@ -1,5 +1,7 @@
 ﻿using AForge;
 using BruTile;
+using Gdk;
+using Gtk;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
@@ -385,7 +387,7 @@ namespace OpenSlideGTK
             this.level = level;
             this.coord = coord;
         }
-        public async Task<byte[]> GetSlice(SliceInfo sliceInfo)
+        public async Task<byte[]> GetSlice(SliceInfo sliceInfo, GLContext context)
         {
             if (stitch == null)
                 stitch = new Stitch();
@@ -415,7 +417,7 @@ namespace OpenSlideGTK
                     {
                         c = Bitmap.Convert48BitTo24BitRGB(c);
                     }
-                    if (useGPU)
+                    if (useGPU && px == PixelFormat.Indexed)
                     {
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
