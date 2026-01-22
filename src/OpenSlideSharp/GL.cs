@@ -4,6 +4,7 @@ using GLib;
 using Gtk;
 using OpenTK;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.Desktop;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -11,7 +12,7 @@ using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
 using PixelType = OpenTK.Graphics.OpenGL4.PixelType;
 namespace BioGTK
 {
-    public class TileCopyGL : IDisposable
+    public class TileCopyGL : GameWindow
     {
         private int computeShaderProgram;
         private int computeShader;
@@ -25,17 +26,14 @@ namespace BioGTK
         private int offsetYLocation;
         private int canvasTileWidthLocation;
         private int canvasTileHeightLocation;
-
-        public TileCopyGL(GLContext gL)
-        {
-            InitializeShaders(gL);
+        public TileCopyGL(GameWindowSettings gws, NativeWindowSettings nws)
+            : base(gws, nws) 
+        { 
+            InitializeShaders();
         }
 
-        private void InitializeShaders(GLContext gl)
+        private void InitializeShaders()
         {
-            // IMPORTANT: Load bindings here
-            Native.LoadBindings(gl);
-            
             // Create compute shader
             //if (glArea.Error != null)
             //    throw new Exception("OpenGL context creation failed");
@@ -265,194 +263,7 @@ void main()
 
             return data;
         }
-
-        public static class Native
-        {
-            // ------------------------------------------------------------------
-            // Platform detection
-            // ------------------------------------------------------------------
-
-            public static readonly bool IsWindows =
-                RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-            public static readonly bool IsLinux =
-                RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-
-            public static readonly bool IsOSX =
-                RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
-
-            // ------------------------------------------------------------------
-            // Native library names
-            // ------------------------------------------------------------------
-
-            private const string GdkLibWin = "libgdk-3-0.dll";
-            private const string GdkLibLin = "libgdk-3.so.0";
-            private const string GdkLibOSX = "libgdk-3.dylib";
-
-            // ------------------------------------------------------------------
-            // Windows imports
-            // ------------------------------------------------------------------
-
-            [DllImport(GdkLibWin, EntryPoint = "gdk_gl_context_get_current")]
-            private static extern IntPtr gdk_gl_context_get_current();
-
-            [DllImport(GdkLibWin, EntryPoint = "gdk_gl_context_get_proc_address")]
-            private static extern IntPtr gdk_gl_context_get_proc_address_w(
-                IntPtr context,
-                string procName
-            );
-
-            // ------------------------------------------------------------------
-            // Linux imports
-            // ------------------------------------------------------------------
-
-            [DllImport(GdkLibLin, EntryPoint = "gdk_gl_context_get_current")]
-            private static extern IntPtr linux_gdk_gl_context_get_current();
-
-            [DllImport(GdkLibLin, EntryPoint = "gdk_gl_context_get_proc_address")]
-            private static extern IntPtr linux_gdk_gl_context_get_proc_address(
-                IntPtr context,
-                string procName
-            );
-
-            // ------------------------------------------------------------------
-            // macOS imports
-            // ------------------------------------------------------------------
-
-            [DllImport(GdkLibOSX, EntryPoint = "gdk_gl_context_get_current")]
-            private static extern IntPtr osx_gdk_gl_context_get_current();
-
-            [DllImport(GdkLibOSX, EntryPoint = "gdk_gl_context_get_proc_address")]
-            private static extern IntPtr osx_gdk_gl_context_get_proc_address(
-                IntPtr context,
-                string procName
-            );
-
-            // ------------------------------------------------------------------
-            // Public API
-            // ------------------------------------------------------------------
-
-            public static IntPtr GetCurrentGLContextPointer()
-            {
-                if (IsWindows) return gdk_gl_context_get_current();
-                if (IsLinux) return linux_gdk_gl_context_get_current();
-                if (IsOSX) return osx_gdk_gl_context_get_current();
-
-                return IntPtr.Zero;
-            }
-
-            public static GLContext GetCurrentGLContext()
-            {
-                IntPtr ptr = GetCurrentGLContextPointer();
-                if (ptr == IntPtr.Zero)
-                    return null;
-
-                return GLib.Object.GetObject(ptr) as GLContext;
-            }
-
-            public static void LoadBindings(GLContext context)
-            {
-                if (context == null)
-                    throw new ArgumentNullException(nameof(context));
-                GL.LoadBindings(new GtkBindingsContext(context.Handle));
-            }
-            static class WglNative
-            {
-                [DllImport("opengl32.dll", CharSet = CharSet.Ansi)]
-                public static extern IntPtr wglGetProcAddress(string procName);
-
-                [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
-                public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-
-                [DllImport("kernel32.dll")]
-                public static extern IntPtr LoadLibrary(string lpFileName);
-            }
-            private sealed class GtkBindingsContext : IBindingsContext
-            {
-                private readonly IntPtr gdkContext;
-                private static readonly IntPtr OpenGl32 =
-                    WglNative.LoadLibrary("opengl32.dll");
-
-                public GtkBindingsContext(IntPtr context)
-                {
-                    gdkContext = context;
-                }
-
-                public IntPtr GetProcAddress(string procName)
-                {
-                    // ---------------- Windows ----------------
-                    if (Native.IsWindows)
-                    {
-                        // Try WGL first
-                        IntPtr addr = WglNative.wglGetProcAddress(procName);
-                        if (addr != IntPtr.Zero)
-                            return addr;
-
-                        // Fallback to opengl32.dll
-                        return WglNative.GetProcAddress(OpenGl32, procName);
-                    }
-
-                    // ---------------- Linux ----------------
-                    if (Native.IsLinux)
-                        return Native.linux_gdk_gl_context_get_proc_address(gdkContext, procName);
-
-                    // ---------------- macOS ----------------
-                    if (Native.IsOSX)
-                        return Native.osx_gdk_gl_context_get_proc_address(gdkContext, procName);
-
-                    return IntPtr.Zero;
-                }
-            }
-
-        }
-
-        public class GlWidget : GLArea
-        {
-            private bool initialized;
-
-            public GlWidget()
-            {
-                HasDepthBuffer = true;
-                AutoRender = true;
-
-                Realized += OnRealized;
-                Render += GlWidget_Render;
-            }
-
-            private void GlWidget_Render(object o, RenderArgs args)
-            {
-                throw new NotImplementedException();
-            }
-
-            private void OnRealized(object sender, EventArgs e)
-            {
-                MakeCurrent();
-
-                if (Error != null)
-                    throw new Exception("Failed to create OpenGL context");
-                /*
-                if (!initialized)
-                {
-                    LoadOpenTkBindings();
-                    initialized = true;
-                }
-                */
-            }
-
-            private bool OnRender(object sender, RenderArgs args)
-            {
-                MakeCurrent();
-                GL.Viewport(0, 0, AllocatedWidth, AllocatedHeight);
-                GL.ClearColor(0f, 0f, 0f, 1f);
-                GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-                // Your GL rendering here
-
-                return true;
-            }
-        }
-
-        public void Dispose()
+        public override void Dispose()
         {
             if (computeShader != 0)
             {
@@ -465,6 +276,7 @@ void main()
                 GL.DeleteProgram(computeShaderProgram);
                 computeShaderProgram = 0;
             }
+            base.Dispose();
         }
     }
 }

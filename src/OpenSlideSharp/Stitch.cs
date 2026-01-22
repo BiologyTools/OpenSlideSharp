@@ -448,26 +448,10 @@ void main()
                     MakeCurrent();
 
                     if (Error != null)
-                        throw new Exception("Failed to create OpenGL context");
-                    /*
-                    if (!initialized)
                     {
-                        LoadOpenTkBindings();
+                        Native.LoadBindings(Context);
                         initialized = true;
                     }
-                    */
-                }
-
-                private bool OnRender(object sender, RenderArgs args)
-                {
-                    MakeCurrent();
-                    GL.Viewport(0, 0, AllocatedWidth, AllocatedHeight);
-                    GL.ClearColor(0f, 0f, 0f, 1f);
-                    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-                    // Your GL rendering here
-
-                    return true;
                 }
             }
 
@@ -486,9 +470,11 @@ void main()
                 }
             }
         }
-        public Stitch(GLContext gl)
+        GLContext con;
+        public Stitch(GLContext co)
         {
-            Initialize(gl);
+            con = co;
+            Initialize(co);
         }
 
         // Public tile query methods
@@ -551,12 +537,6 @@ void main()
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                if(e.Message.Contains("LoadBindings()"))
-                {
-                    BioGTK.TileCopyGL.Native.LoadBindings(BioGTK.TileCopyGL.Native.GetCurrentGLContext());
-                    OpenSlideGTK.OpenGLStitcher openGLStitcher = new OpenGLStitcher(con);
-                    goto St;
-                }
                 return false;
             }
         }
@@ -568,7 +548,7 @@ void main()
             int pxheight,
             double viewX,
             double viewY,
-            double viewResolution, GLContext con)
+            double viewResolution)
         {
             try
             {
@@ -624,18 +604,23 @@ void main()
         private int renderbuffer;
         private int vao;
         private int vbo;
-
+        bool init = false;
         private int currentFboWidth = -1;
         private int currentFboHeight = -1;
 
         public OpenGLStitcher(GLContext con)
         {
-            InitializeOpenGL(con);
+            if (!init)
+            {
+                InitializeOpenGL(con);
+                init = true;
+            }
         }
 
         private void InitializeOpenGL(GLContext con)
         {
-            
+            if (shaderProgram != null)
+                return;
             // Compile shaders
             shaderProgram = new ShaderProgram(VertexShaderSource, FragmentShaderSource);
 
@@ -659,7 +644,7 @@ void main()
             -1.0f, -1.0f,       0.0f, 0.0f,
                 1.0f,  1.0f,       1.0f, 1.0f,
             -1.0f,  1.0f,       0.0f, 1.0f
-        };
+            };
 
             GL.GenVertexArrays(1, out vao);
             GL.GenBuffers(1, out vbo);
@@ -902,23 +887,32 @@ FragColor = texture(tileTexture, TexCoord);
 
         public ShaderProgram(string vertexSource, string fragmentSource)
         {
-            int vertexShader = CompileShader(ShaderType.VertexShader, vertexSource);
-            int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentSource);
+            try
+            {
+                int vertexShader = CompileShader(ShaderType.VertexShader, vertexSource);
+                int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentSource);
 
-            programId = GL.CreateProgram();
-            GL.AttachShader(programId, vertexShader);
-            GL.AttachShader(programId, fragmentShader);
-            GL.LinkProgram(programId);
+                programId = GL.CreateProgram();
+                GL.AttachShader(programId, vertexShader);
+                GL.AttachShader(programId, fragmentShader);
+                GL.LinkProgram(programId);
 
-            CheckProgramLinkStatus();
+                CheckProgramLinkStatus();
 
-            GL.DeleteShader(vertexShader);
-            GL.DeleteShader(fragmentShader);
+                //GL.DeleteShader(vertexShader);
+                //GL.DeleteShader(fragmentShader);
+            }
+            catch (Exception e)
+            {
+                GLContext.Current.MakeCurrent();
+                //Native.LoadBindings(context);
+                Console.WriteLine(e.Message);
+            }
+            
         }
 
         private int CompileShader(ShaderType type, string source)
         {
-            
             int shader = GL.CreateShader(type);
             GL.ShaderSource(shader, source);
             GL.CompileShader(shader);

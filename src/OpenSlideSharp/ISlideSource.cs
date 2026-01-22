@@ -377,7 +377,7 @@ namespace OpenSlideGTK
         public async Task<byte[]> GetSlice(SliceInfo sliceInfo, PixelFormat px, GLContext con)
         {
             if (stitch == null)
-                stitch = new Stitch(con);
+                stitch = new Stitch(GLContext.Current);
             if(cache == null)
                 cache = new TileCache(this, 200);
             var curLevel = this.Schema.Resolutions[this.level];
@@ -427,10 +427,9 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    if(con != null)
-                        stitch.Initialize(con);
+                    stitch.Initialize(con);
                     if(tileInfos.Count() > 0 && stitch.initialized)
-                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel, con);
+                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else
                     {
                         return null;
