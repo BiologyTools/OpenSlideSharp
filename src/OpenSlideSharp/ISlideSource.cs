@@ -1,4 +1,5 @@
 ﻿using AForge;
+using Atk;
 using BruTile;
 using Gdk;
 using Gtk;
@@ -86,7 +87,7 @@ namespace OpenSlideGTK
     {
         public LruCache<Info, byte[]> cache;
         private int capacity;
-        private Stitch stitch = new Stitch();
+        private Stitch stitch;
         SlideSourceBase source = null;
         public TileCache(SlideSourceBase source, int capacity = 100)
         {
@@ -108,30 +109,15 @@ namespace OpenSlideGTK
             return tile;
         }
 
-        public byte[] GetTileSync(Info inf, double unitsPerPixel)
+        public byte[] GetTileSync(Info inf)
         {
-        A:
-            try
-            {
-                if (SlideSourceBase.useGPU)
-                {
-                    if (stitch.HasTile(inf.Extent.WorldToPixelInvertedY(unitsPerPixel)))
-                        return null;
-                }
-            }
-            catch (Exception)
-            {
-                SlideSourceBase.useGPU = false;
-                goto A;
-            }
-
             byte[] data = cache.Get(inf);
             if (data != null)
             {
                 return data;
             }
             byte[] tile = LoadTileSync(inf);
-            if (tile != null && !SlideSourceBase.useGPU)
+            if (tile != null)
                 AddTile(inf, tile);
             return tile;
         }
@@ -227,7 +213,7 @@ namespace OpenSlideGTK
         private ZCT coord;
         public static bool UseVips = true;
         public static bool useGPU = true;
-        public Stitch stitch = new Stitch();
+        public Stitch stitch;
         private PixelFormat px;
         public AForge.Size PyramidalSize;
         public PointD PyramidalOrigin;
@@ -387,10 +373,11 @@ namespace OpenSlideGTK
             this.level = level;
             this.coord = coord;
         }
-        public async Task<byte[]> GetSlice(SliceInfo sliceInfo, GLContext context)
+
+        public async Task<byte[]> GetSlice(SliceInfo sliceInfo, PixelFormat px, GLContext con)
         {
             if (stitch == null)
-                stitch = new Stitch();
+                stitch = new Stitch(con);
             if(cache == null)
                 cache = new TileCache(this, 200);
             var curLevel = this.Schema.Resolutions[this.level];
@@ -400,7 +387,7 @@ namespace OpenSlideGTK
             await this.FetchTilesAsync(tileInfos.ToList(), this.level, coord);
             foreach (BruTile.TileInfo t in tileInfos)
             {
-                byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level), curUnitsPerPixel);
+                byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level));
                 if (c != null)
                 {
                     if (c.Length == 4 * 256 * 256)
@@ -417,14 +404,13 @@ namespace OpenSlideGTK
                     {
                         c = Bitmap.Convert48BitTo24BitRGB(c);
                     }
-                    if (useGPU && px == PixelFormat.Indexed)
+                    if (useGPU)
                     {
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight), sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight,c);
-                        tiles.Add(Tuple.Create(tileInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
-
+                        stitch.AddTile(new Stitch.GpuTile(t, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight), sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight,c);
+                        tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
                         tiles.Add(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
@@ -441,8 +427,14 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    if(tileInfos.Count() > 0)
-                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
+                    if(con != null)
+                        stitch.Initialize(con);
+                    if(tileInfos.Count() > 0 && stitch.initialized)
+                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel, con);
+                    else
+                    {
+                        return null;
+                    }
                 }
                 catch (Exception e)
                 {
