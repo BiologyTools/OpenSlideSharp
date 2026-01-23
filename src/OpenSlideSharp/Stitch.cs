@@ -27,7 +27,7 @@ namespace OpenSlideGTK
     public class Stitch
     {
         private OpenGLStitcher stitcher;
-        private TileTextureCache textureCache;
+        private TileTextureCache textureCache = new TileTextureCache();
         public bool initialized = false;
         public List<GpuTile> gpuTiles = new();
         public class TileCopyGL : IDisposable
@@ -355,30 +355,22 @@ void main()
             }
         }
 
-        public void AddTile(GpuTile tileInfo, int width, int height, byte[] pixelData)
+        public void AddTile(GpuTile tfi, int width, int height, byte[] pixelData)
         {
-            if (HasTile(tileInfo.Index))
+            if (HasTile(tfi.Index))
                 return;
-
-            var gpuTile = new GpuTile(tileInfo, pixelData, width, height);
-            gpuTiles.Add(gpuTile);
-
-            if (initialized && textureCache != null)
-            {
-                textureCache.UploadTexture(tileInfo.Index, pixelData, width, height);
-            }
+            gpuTiles.Add(tfi);
+            textureCache.UploadTexture(tfi.Index, pixelData, width, height);
+            return;
         }
 
         // Initialization
         public bool Initialize()
         {
-          
             try
             {
-                
                 if (initialized)
                     return true;
-                textureCache = new TileTextureCache();
                 stitcher = new OpenGLStitcher();
                 initialized = true;
                 return true;
@@ -423,16 +415,17 @@ void main()
         }
 
         // GPU tile data structure
-        public sealed class GpuTile : TileInfo
+        public class GpuTile
         {
             public TileIndex Index;
             public int Width;
             public int Height;
             public byte[] Bytes;
-
+            public Extent Extent;
             public GpuTile(TileInfo tf, byte[] bts, int pxwidth, int pxheight)
             {
                 Index = tf.Index;
+                Extent = tf.Extent;
                 Width = pxwidth;
                 Height = pxheight;
                 Bytes = bts;
@@ -572,7 +565,7 @@ void main()
             foreach (var tile in tiles)
             {
                 RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight,
-                    viewX, viewY, viewResolution);
+                    viewX, -viewY, viewResolution);
             }
 
             // Read back pixels
@@ -605,8 +598,6 @@ void main()
 
             // Get texture from cache
             int textureId = textureCache.GetTexture(tile.Index);
-            if (textureId == 0)
-                return;
 
             // Calculate tile position in viewport
             int tileWidth = gpuTile.Width;
@@ -700,13 +691,21 @@ FragColor = texture(tileTexture, TexCoord);
                 (int)TextureWrapMode.ClampToEdge);
 
             GL.BindTexture(TextureTarget.Texture2D, 0);
-
-            textureCache[index] = textureId;
+            textureCache.Add(index,textureId);
         }
 
         public int GetTexture(TileIndex index)
         {
-            return textureCache.TryGetValue(index, out int textureId) ? textureId : 0;
+            bool t = textureCache.TryGetValue(index, out int tex);
+            if (!t)
+            {
+                textureCache.Add(index, textureCache.Count);
+                return tex;
+            }
+            else
+            {
+                return tex;
+            }
         }
 
         public void ReleaseTexture(TileIndex index)
