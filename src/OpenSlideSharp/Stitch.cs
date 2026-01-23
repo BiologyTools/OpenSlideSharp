@@ -10,6 +10,7 @@ using ManagedCuda.BasicTypes;
 using ManagedCuda.VectorTypes;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Windowing.Desktop;
 using Pango;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -30,7 +31,7 @@ namespace OpenSlideGTK
         private TileTextureCache textureCache = new TileTextureCache();
         public bool initialized = false;
         public List<GpuTile> gpuTiles = new();
-        public class TileCopyGL : IDisposable
+        public class TileCopyGL : GameWindow
         {
             private int computeShaderProgram;
             private int computeShader;
@@ -45,12 +46,13 @@ namespace OpenSlideGTK
             private int canvasTileWidthLocation;
             private int canvasTileHeightLocation;
 
-            public TileCopyGL(GLContext gL)
+            public TileCopyGL(GameWindowSettings gws, NativeWindowSettings nws)
+            : base(gws, nws)
             {
-                InitializeShaders(gL);
+                InitializeShaders();
             }
 
-            private void InitializeShaders(GLContext gl)
+            private void InitializeShaders()
             {
                 // Create compute shader
                 //if (glArea.Error != null)
@@ -322,11 +324,6 @@ void main()
                 }
             }
         }
-        public Stitch()
-        {
-            //con = co;
-            //Initialize(co);
-        }
 
         // Public tile query methods
         public bool HasTile(TileIndex ex)
@@ -565,13 +562,12 @@ void main()
             foreach (var tile in tiles)
             {
                 RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight,
-                    viewX, -viewY, viewResolution);
+                    viewX, viewY, viewResolution);
             }
 
             // Read back pixels
-            byte[] viewportData = new byte[pxwidth * pxheight * 4];
-            GL.ReadPixels(0, 0, pxwidth, pxheight,
-                PixelFormat.Rgba, PixelType.UnsignedByte, viewportData);
+            byte[] viewportData = new byte[pxwidth * pxheight * 3];
+            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Rgb, PixelType.UnsignedByte, viewportData);
 
             // Cleanup
             GL.BindVertexArray(0);
@@ -589,7 +585,7 @@ void main()
             int pxheight,
             double viewX,
             double viewY,
-            double viewResolution)
+            double viewResolution, TileCopyGL tileCopy)
         {
             // Find matching GPU tile
             var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
@@ -611,6 +607,7 @@ void main()
 
             int scaledWidth = tileWidth * levelScale;
             int scaledHeight = tileHeight * levelScale;
+            //tileCopy.CopyTileToCanvas();
 
             // Convert to normalized device coordinates (-1 to 1)
             float ndcX = (offsetX / (float)pxwidth) * 2.0f - 1.0f;
@@ -627,6 +624,7 @@ void main()
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture2D, textureId);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+
         }
 
         // Shader sources
@@ -747,13 +745,11 @@ FragColor = texture(tileTexture, TexCoord);
 
                 CheckProgramLinkStatus();
 
-                //GL.DeleteShader(vertexShader);
-                //GL.DeleteShader(fragmentShader);
+                GL.DeleteShader(vertexShader);
+                GL.DeleteShader(fragmentShader);
             }
             catch (Exception e)
             {
-                GLContext.Current.MakeCurrent();
-                //Native.LoadBindings(context);
                 Console.WriteLine(e.Message);
             }
             

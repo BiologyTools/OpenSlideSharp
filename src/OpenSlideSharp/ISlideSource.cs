@@ -406,8 +406,9 @@ namespace OpenSlideGTK
                     }
                     if (useGPU)
                     {
+                        
                         TileInfo tileInfo = new TileInfo();
-                        tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+                        tileInfo.Extent = t.Extent;
                         tileInfo.Index = t.Index;
                         stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight), sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight,c);
                         tiles.Add(Tuple.Create(t.Extent, c));
