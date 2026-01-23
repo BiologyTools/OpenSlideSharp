@@ -374,10 +374,10 @@ namespace OpenSlideGTK
             this.coord = coord;
         }
 
-        public async Task<byte[]> GetSlice(SliceInfo sliceInfo, PixelFormat px, GLContext con)
+        public async Task<byte[]> GetSlice(SliceInfo sliceInfo, PixelFormat px)
         {
             if (stitch == null)
-                stitch = new Stitch(GLContext.Current);
+                stitch = new Stitch();
             if(cache == null)
                 cache = new TileCache(this, 200);
             var curLevel = this.Schema.Resolutions[this.level];
@@ -427,7 +427,7 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    stitch.Initialize(con);
+                    stitch.Initialize();
                     if(tileInfos.Count() > 0 && stitch.initialized)
                         return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else

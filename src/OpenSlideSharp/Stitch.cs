@@ -52,9 +52,6 @@ namespace OpenSlideGTK
 
             private void InitializeShaders(GLContext gl)
             {
-                // IMPORTANT: Load bindings here
-                Native.LoadBindings(gl);
-                
                 // Create compute shader
                 //if (glArea.Error != null)
                 //    throw new Exception("OpenGL context creation failed");
@@ -285,146 +282,6 @@ void main()
                 return data;
             }
 
-            public static class Native
-            {
-                // ------------------------------------------------------------------
-                // Platform detection
-                // ------------------------------------------------------------------
-
-                public static readonly bool IsWindows =
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-                public static readonly bool IsLinux =
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-
-                public static readonly bool IsOSX =
-                    RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
-
-                // ------------------------------------------------------------------
-                // Native library names
-                // ------------------------------------------------------------------
-
-                private const string GdkLibWin = "libgdk-3-0.dll";
-                private const string GdkLibLin = "libgdk-3.so.0";
-                private const string GdkLibOSX = "libgdk-3.dylib";
-
-                // ------------------------------------------------------------------
-                // Windows imports
-                // ------------------------------------------------------------------
-
-                [DllImport(GdkLibWin, EntryPoint = "gdk_gl_context_get_current")]
-                private static extern IntPtr gdk_gl_context_get_current();
-
-                [DllImport(GdkLibWin, EntryPoint = "gdk_gl_context_get_proc_address")]
-                private static extern IntPtr gdk_gl_context_get_proc_address_w(
-                    IntPtr context,
-                    string procName
-                );
-
-                // ------------------------------------------------------------------
-                // Linux imports
-                // ------------------------------------------------------------------
-
-                [DllImport(GdkLibLin, EntryPoint = "gdk_gl_context_get_current")]
-                private static extern IntPtr linux_gdk_gl_context_get_current();
-
-                [DllImport(GdkLibLin, EntryPoint = "gdk_gl_context_get_proc_address")]
-                private static extern IntPtr linux_gdk_gl_context_get_proc_address(
-                    IntPtr context,
-                    string procName
-                );
-
-                // ------------------------------------------------------------------
-                // macOS imports
-                // ------------------------------------------------------------------
-
-                [DllImport(GdkLibOSX, EntryPoint = "gdk_gl_context_get_current")]
-                private static extern IntPtr osx_gdk_gl_context_get_current();
-
-                [DllImport(GdkLibOSX, EntryPoint = "gdk_gl_context_get_proc_address")]
-                private static extern IntPtr osx_gdk_gl_context_get_proc_address(
-                    IntPtr context,
-                    string procName
-                );
-
-                // ------------------------------------------------------------------
-                // Public API
-                // ------------------------------------------------------------------
-
-                public static IntPtr GetCurrentGLContextPointer()
-                {
-                    if (IsWindows) return gdk_gl_context_get_current();
-                    if (IsLinux) return linux_gdk_gl_context_get_current();
-                    if (IsOSX) return osx_gdk_gl_context_get_current();
-
-                    return IntPtr.Zero;
-                }
-
-                public static GLContext GetCurrentGLContext()
-                {
-                    IntPtr ptr = GetCurrentGLContextPointer();
-                    if (ptr == IntPtr.Zero)
-                        return null;
-
-                    return GLib.Object.GetObject(ptr) as GLContext;
-                }
-
-                public static void LoadBindings(GLContext context)
-                {
-                    if (context == null)
-                        throw new ArgumentNullException(nameof(context));
-                    GL.LoadBindings(new GtkBindingsContext(context.Handle));
-                }
-                static class WglNative
-                {
-                    [DllImport("opengl32.dll", CharSet = CharSet.Ansi)]
-                    public static extern IntPtr wglGetProcAddress(string procName);
-
-                    [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
-                    public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-
-                    [DllImport("kernel32.dll")]
-                    public static extern IntPtr LoadLibrary(string lpFileName);
-                }
-                private sealed class GtkBindingsContext : IBindingsContext
-                {
-                    private readonly IntPtr gdkContext;
-                    private static readonly IntPtr OpenGl32 =
-                        WglNative.LoadLibrary("opengl32.dll");
-
-                    public GtkBindingsContext(IntPtr context)
-                    {
-                        gdkContext = context;
-                    }
-
-                    public IntPtr GetProcAddress(string procName)
-                    {
-                        // ---------------- Windows ----------------
-                        if (Native.IsWindows)
-                        {
-                            // Try WGL first
-                            IntPtr addr = WglNative.wglGetProcAddress(procName);
-                            if (addr != IntPtr.Zero)
-                                return addr;
-
-                            // Fallback to opengl32.dll
-                            return WglNative.GetProcAddress(OpenGl32, procName);
-                        }
-
-                        // ---------------- Linux ----------------
-                        if (Native.IsLinux)
-                            return Native.linux_gdk_gl_context_get_proc_address(gdkContext, procName);
-
-                        // ---------------- macOS ----------------
-                        if (Native.IsOSX)
-                            return Native.osx_gdk_gl_context_get_proc_address(gdkContext, procName);
-
-                        return IntPtr.Zero;
-                    }
-                }
-
-            }
-
             public class GlWidget : GLArea
             {
                 private bool initialized;
@@ -447,11 +304,6 @@ void main()
                 {
                     MakeCurrent();
 
-                    if (Error != null)
-                    {
-                        Native.LoadBindings(Context);
-                        initialized = true;
-                    }
                 }
             }
 
@@ -470,11 +322,10 @@ void main()
                 }
             }
         }
-        GLContext con;
-        public Stitch(GLContext co)
+        public Stitch()
         {
-            con = co;
-            Initialize(co);
+            //con = co;
+            //Initialize(co);
         }
 
         // Public tile query methods
@@ -519,18 +370,16 @@ void main()
         }
 
         // Initialization
-        public bool Initialize(GLContext con)
+        public bool Initialize()
         {
-            if (con == null)
-                return false;
-            St:
+          
             try
             {
                 
                 if (initialized)
                     return true;
                 textureCache = new TileTextureCache();
-                stitcher = new OpenGLStitcher(con);
+                stitcher = new OpenGLStitcher();
                 initialized = true;
                 return true;
             }
@@ -554,7 +403,7 @@ void main()
             {
                 if(stitcher == null)
                 {
-                    stitcher = new OpenGLStitcher(con);
+                    stitcher = new OpenGLStitcher();
                 }
                 return stitcher.Render(
                     tiles,
@@ -608,16 +457,16 @@ void main()
         private int currentFboWidth = -1;
         private int currentFboHeight = -1;
 
-        public OpenGLStitcher(GLContext con)
+        public OpenGLStitcher()
         {
             if (!init)
             {
-                InitializeOpenGL(con);
+                InitializeOpenGL();
                 init = true;
             }
         }
 
-        private void InitializeOpenGL(GLContext con)
+        private void InitializeOpenGL()
         {
             if (shaderProgram != null)
                 return;
