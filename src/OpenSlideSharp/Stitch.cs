@@ -21,6 +21,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using static NetVips.Enums;
 using static OpenSlideGTK.Stitch;
 using PixelFormat = OpenTK.Graphics.OpenGL.PixelFormat;
 namespace OpenSlideGTK
@@ -31,6 +32,7 @@ namespace OpenSlideGTK
         private TileTextureCache textureCache = new TileTextureCache();
         public bool initialized = false;
         public List<GpuTile> gpuTiles = new();
+        public TileCopyGL tileCopy;
         public class TileCopyGL : GameWindow
         {
             private int computeShaderProgram;
@@ -45,11 +47,12 @@ namespace OpenSlideGTK
             private int offsetYLocation;
             private int canvasTileWidthLocation;
             private int canvasTileHeightLocation;
-
+            public int canvasTexture;
             public TileCopyGL(GameWindowSettings gws, NativeWindowSettings nws)
             : base(gws, nws)
             {
                 InitializeShaders();
+                
             }
 
             private void InitializeShaders()
@@ -94,6 +97,8 @@ namespace OpenSlideGTK
                 offsetYLocation = GL.GetUniformLocation(computeShaderProgram, "offsetY");
                 canvasTileWidthLocation = GL.GetUniformLocation(computeShaderProgram, "canvasTileWidth");
                 canvasTileHeightLocation = GL.GetUniformLocation(computeShaderProgram, "canvasTileHeight");
+
+                canvasTexture = CreateCanvasTexture(ClientRectangle.Size.X, ClientRectangle.Size.Y);
             }
 
             private string LoadShaderSource(string filename)
@@ -213,11 +218,11 @@ void main()
                 GL.TexImage2D(
                     TextureTarget.Texture2D,
                     0,
-                    PixelInternalFormat.Rgb,
+                    PixelInternalFormat.Rgba,
                     tileWidth,
                     tileHeight,
                     0,
-                    PixelFormat.Rgb,
+                    PixelFormat.Rgba,
                     PixelType.UnsignedByte,
                     tileData);
 
@@ -283,7 +288,6 @@ void main()
 
                 return data;
             }
-
             public class GlWidget : GLArea
             {
                 private bool initialized;
@@ -351,7 +355,14 @@ void main()
                 gpuTiles.Remove(tile);
             }
         }
-
+        public void AddTile(GpuTile tfi)
+        {
+            if (HasTile(tfi.Index))
+                return;
+            gpuTiles.Add(tfi);
+            textureCache.UploadTexture(tfi.Index, tfi.Bytes, tfi.Width, tfi.Height);
+            return;
+        }
         public void AddTile(GpuTile tfi, int width, int height, byte[] pixelData)
         {
             if (HasTile(tfi.Index))
@@ -362,13 +373,14 @@ void main()
         }
 
         // Initialization
-        public bool Initialize()
+        public bool Initialize(Stitch.TileCopyGL tileCopy)
         {
             try
             {
                 if (initialized)
                     return true;
                 stitcher = new OpenGLStitcher();
+                this.tileCopy = tileCopy;
                 initialized = true;
                 return true;
             }
@@ -386,11 +398,12 @@ void main()
             int pxheight,
             double viewX,
             double viewY,
-            double viewResolution)
+            double viewResolution,
+            TileCopyGL tileCopy)
         {
             try
             {
-                if(stitcher == null)
+                if (stitcher == null)
                 {
                     stitcher = new OpenGLStitcher();
                 }
@@ -402,7 +415,9 @@ void main()
                     pxheight,
                     viewX,
                     viewY,
-                    viewResolution);
+                    viewResolution,
+                    tileCopy
+                    );
             }
             catch (Exception ex)
             {
@@ -410,7 +425,6 @@ void main()
                 return null;
             }
         }
-
         // GPU tile data structure
         public class GpuTile
         {
@@ -539,7 +553,8 @@ void main()
             int pxheight,
             double viewX,
             double viewY,
-            double viewResolution)
+            double viewResolution,
+            TileCopyGL copy)
         {
             // Ensure framebuffer matches viewport size
             EnsureFramebufferSize(pxwidth, pxheight);
@@ -562,12 +577,12 @@ void main()
             foreach (var tile in tiles)
             {
                 RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight,
-                    viewX, viewY, viewResolution);
+                    viewX, viewY, viewResolution, copy);
             }
 
             // Read back pixels
-            byte[] viewportData = new byte[pxwidth * pxheight * 3];
-            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Rgb, PixelType.UnsignedByte, viewportData);
+            byte[] viewportData = new byte[pxwidth * pxheight * 4];
+            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Rgba, PixelType.UnsignedByte, viewportData);
 
             // Cleanup
             GL.BindVertexArray(0);
@@ -587,11 +602,13 @@ void main()
             double viewY,
             double viewResolution, TileCopyGL tileCopy)
         {
+            if (tileCopy == null)
+                return;
             // Find matching GPU tile
             var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
             if (gpuTile == null)
                 return;
-
+            
             // Get texture from cache
             int textureId = textureCache.GetTexture(tile.Index);
 
@@ -607,7 +624,8 @@ void main()
 
             int scaledWidth = tileWidth * levelScale;
             int scaledHeight = tileHeight * levelScale;
-            //tileCopy.CopyTileToCanvas();
+
+            tileCopy.CopyTileToCanvas(tileCopy.canvasTexture, pxwidth, pxheight, gpuTile.Bytes,tileWidth,tileHeight,offsetX,offsetY,scaledWidth,scaledHeight);
 
             // Convert to normalized device coordinates (-1 to 1)
             float ndcX = (offsetX / (float)pxwidth) * 2.0f - 1.0f;
@@ -695,17 +713,11 @@ FragColor = texture(tileTexture, TexCoord);
         public int GetTexture(TileIndex index)
         {
             bool t = textureCache.TryGetValue(index, out int tex);
-            if (!t)
-            {
-                textureCache.Add(index, textureCache.Count);
-                return tex;
-            }
-            else
-            {
-                return tex;
-            }
+            if(!t)
+            textureCache.Add(index, textureCache.Count);
+            return tex;
         }
-
+        
         public void ReleaseTexture(TileIndex index)
         {
             if (textureCache.TryGetValue(index, out int textureId))

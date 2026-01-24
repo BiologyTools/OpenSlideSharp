@@ -96,10 +96,9 @@ namespace OpenSlideGTK
             //We check to see if the data is valid.
             if (bgraData.Length != curTileWidth * curTileHeight * 4)
                 return null;
-            byte[] bm = ConvertRgbaToRgb(bgraData);
             if (_enableCache && bgraData != null)
-                _tileCache.Add(tileInfo.Index, bm);
-            return bm;
+                _tileCache.Add(tileInfo.Index, bgraData);
+            return bgraData;
         }
         public static byte[] ConvertRgbaToRgb(byte[] rgbaArray)
         {
