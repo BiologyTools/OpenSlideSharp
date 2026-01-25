@@ -124,6 +124,7 @@ namespace OpenSlideGTK
 
         public void AddTile(Info tileId, byte[] tile)
         {
+
             cache.Add(tileId, tile);
         }
 
@@ -397,7 +398,7 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
@@ -471,7 +472,7 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else

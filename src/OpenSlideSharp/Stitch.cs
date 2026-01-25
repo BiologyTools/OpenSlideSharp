@@ -363,14 +363,6 @@ void main()
             textureCache.UploadTexture(tfi.Index, tfi.Bytes, tfi.Width, tfi.Height);
             return;
         }
-        public void AddTile(GpuTile tfi, int width, int height, byte[] pixelData)
-        {
-            if (HasTile(tfi.Index))
-                return;
-            gpuTiles.Add(tfi);
-            textureCache.UploadTexture(tfi.Index, pixelData, width, height);
-            return;
-        }
 
         // Initialization
         public bool Initialize(Stitch.TileCopyGL tileCopy)
@@ -433,12 +425,15 @@ void main()
             public int Height;
             public byte[] Bytes;
             public Extent Extent;
-            public GpuTile(TileInfo tf, byte[] bts, int pxwidth, int pxheight)
+            public GpuTile(TileInfo tf, byte[] bts)
             {
                 Index = tf.Index;
                 Extent = tf.Extent;
-                Width = pxwidth;
-                Height = pxheight;
+                int w = (int)Math.Round(Math.Sqrt(bts.Length));
+                Width = w;
+                Height = w;
+                if(bts.Length != Width * Height * 4)
+                    throw new Exception("Tile byte array size does not match expected dimensions.");    
                 Bytes = bts;
             }
 
@@ -687,14 +682,15 @@ FragColor = texture(tileTexture, TexCoord);
         {
             if (textureCache.ContainsKey(index))
                 return;
-
             int textureId;
             GL.GenTextures(1, out textureId);
             GL.BindTexture(TextureTarget.Texture2D, textureId);
 
+            int tw = (int)Math.Round(Math.Sqrt(pixelData.Length));
+
             // Upload pixel data
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8,
-                width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixelData);
+                tw, tw, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixelData);
 
             // Set texture parameters
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
