@@ -41,18 +41,14 @@ namespace OpenSlideGTK
             // Uniform locations
             private int canvasWidthLocation;
             private int canvasHeightLocation;
-            private int tileWidthLocation;
-            private int tileHeightLocation;
             private int offsetXLocation;
             private int offsetYLocation;
-            private int canvasTileWidthLocation;
-            private int canvasTileHeightLocation;
             public int canvasTexture;
             public TileCopyGL(GameWindowSettings gws, NativeWindowSettings nws)
             : base(gws, nws)
             {
                 InitializeShaders();
-                
+
             }
 
             private void InitializeShaders()
@@ -91,13 +87,8 @@ namespace OpenSlideGTK
                 // Get uniform locations
                 canvasWidthLocation = GL.GetUniformLocation(computeShaderProgram, "canvasWidth");
                 canvasHeightLocation = GL.GetUniformLocation(computeShaderProgram, "canvasHeight");
-                tileWidthLocation = GL.GetUniformLocation(computeShaderProgram, "tileWidth");
-                tileHeightLocation = GL.GetUniformLocation(computeShaderProgram, "tileHeight");
                 offsetXLocation = GL.GetUniformLocation(computeShaderProgram, "offsetX");
                 offsetYLocation = GL.GetUniformLocation(computeShaderProgram, "offsetY");
-                canvasTileWidthLocation = GL.GetUniformLocation(computeShaderProgram, "canvasTileWidth");
-                canvasTileHeightLocation = GL.GetUniformLocation(computeShaderProgram, "canvasTileHeight");
-
                 canvasTexture = CreateCanvasTexture(ClientRectangle.Size.X, ClientRectangle.Size.Y);
             }
 
@@ -113,7 +104,6 @@ namespace OpenSlideGTK
                 // Embedded shader source as fallback
                 return @"
 #version 430
-
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rgba8, binding = 0) uniform readonly image2D tile;
@@ -121,130 +111,25 @@ layout(rgba8, binding = 1) uniform writeonly image2D canvas;
 
 uniform int canvasWidth;
 uniform int canvasHeight;
-uniform int tileWidth;
-uniform int tileHeight;
 uniform int offsetX;
 uniform int offsetY;
-uniform int canvasTileWidth;
-uniform int canvasTileHeight;
 
 void main()
 {
-    ivec2 globalID = ivec2(gl_GlobalInvocationID.xy);
-    int x = globalID.x;
-    int y = globalID.y;
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-    if (x < canvasTileWidth && y < canvasTileHeight) {
-        int canvasX = x + offsetX;
-        int canvasY = y + offsetY;
+    ivec2 canvasPos = id + ivec2(offsetX, offsetY);
 
-        if (canvasX < canvasWidth && canvasY < canvasHeight) {
-            float scaleX = float(tileWidth) / float(canvasTileWidth);
-            float scaleY = float(tileHeight) / float(canvasTileHeight);
+    if (canvasPos.x < 0 || canvasPos.y < 0 ||
+        canvasPos.x >= canvasWidth || canvasPos.y >= canvasHeight)
+        return;
 
-            int tileX = min(int(float(x) * scaleX), tileWidth - 1);
-            int tileY = min(int(float(y) * scaleY), tileHeight - 1);
-
-            vec4 pixel = imageLoad(tile, ivec2(tileX, tileY));
-            imageStore(canvas, ivec2(canvasX, canvasY), pixel);
-        }
-    }
-}";
+    vec4 pixel = imageLoad(tile, id);
+    imageStore(canvas, canvasPos, pixel);
+}"
+;
             }
 
-            /// <summary>
-            /// Copy a tile to canvas using OpenGL compute shader
-            /// </summary>
-            public void CopyTileToCanvas(
-                int canvasTexture,
-                int canvasWidth,
-                int canvasHeight,
-                int tileTexture,
-                int tileWidth,
-                int tileHeight,
-                int offsetX,
-                int offsetY,
-                int canvasTileWidth,
-                int canvasTileHeight)
-            {
-                // Use the compute shader program
-                GL.UseProgram(computeShaderProgram);
-
-                // Set uniforms
-                GL.Uniform1(canvasWidthLocation, canvasWidth);
-                GL.Uniform1(canvasHeightLocation, canvasHeight);
-                GL.Uniform1(tileWidthLocation, tileWidth);
-                GL.Uniform1(tileHeightLocation, tileHeight);
-                GL.Uniform1(offsetXLocation, offsetX);
-                GL.Uniform1(offsetYLocation, offsetY);
-                GL.Uniform1(canvasTileWidthLocation, canvasTileWidth);
-                GL.Uniform1(canvasTileHeightLocation, canvasTileHeight);
-
-                // Bind textures as images
-                GL.BindImageTexture(0, tileTexture, 0, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rgba8);
-                GL.BindImageTexture(1, canvasTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
-
-                // Calculate work group counts (round up division)
-                int workGroupsX = (canvasTileWidth + 15) / 16;
-                int workGroupsY = (canvasTileHeight + 15) / 16;
-
-                // Dispatch compute shader
-                GL.DispatchCompute(workGroupsX, workGroupsY, 1);
-
-                // Ensure compute shader finishes before reading
-                GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
-            }
-
-            /// <summary>
-            /// Copy tile from byte array to canvas texture
-            /// </summary>
-            public void CopyTileToCanvas(
-                int canvasTexture,
-                int canvasWidth,
-                int canvasHeight,
-                byte[] tileData,
-                int tileWidth,
-                int tileHeight,
-                int offsetX,
-                int offsetY,
-                int canvasTileWidth,
-                int canvasTileHeight)
-            {
-                // Create temporary texture for tile data
-                int tileTexture = GL.GenTexture();
-                GL.BindTexture(TextureTarget.Texture2D, tileTexture);
-
-                // Upload tile data
-                GL.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    PixelInternalFormat.Rgba,
-                    tileWidth,
-                    tileHeight,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    tileData);
-
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-
-                // Copy tile to canvas
-                CopyTileToCanvas(
-                    canvasTexture,
-                    canvasWidth,
-                    canvasHeight,
-                    tileTexture,
-                    tileWidth,
-                    tileHeight,
-                    offsetX,
-                    offsetY,
-                    canvasTileWidth,
-                    canvasTileHeight);
-
-                // Cleanup temporary texture
-                GL.DeleteTexture(tileTexture);
-            }
 
             /// <summary>
             /// Create a canvas texture
@@ -261,7 +146,7 @@ void main()
                     width,
                     height,
                     0,
-                    PixelFormat.Rgba,
+                    PixelFormat.Bgra,
                     PixelType.UnsignedByte,
                     IntPtr.Zero);
 
@@ -271,23 +156,6 @@ void main()
                 return texture;
             }
 
-            /// <summary>
-            /// Read canvas texture back to CPU memory
-            /// </summary>
-            public byte[] ReadCanvasTexture(int canvasTexture, int width, int height)
-            {
-                byte[] data = new byte[width * height * 4]; // RGBA
-
-                GL.BindTexture(TextureTarget.Texture2D, canvasTexture);
-                GL.GetTexImage(
-                    TextureTarget.Texture2D,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    data);
-
-                return data;
-            }
             public class GlWidget : GLArea
             {
                 private bool initialized;
@@ -303,28 +171,13 @@ void main()
 
                 private void GlWidget_Render(object o, RenderArgs args)
                 {
-                    throw new NotImplementedException();
+                    
                 }
 
                 private void OnRealized(object sender, EventArgs e)
                 {
                     MakeCurrent();
 
-                }
-            }
-
-            public void Dispose()
-            {
-                if (computeShader != 0)
-                {
-                    GL.DeleteShader(computeShader);
-                    computeShader = 0;
-                }
-
-                if (computeShaderProgram != 0)
-                {
-                    GL.DeleteProgram(computeShaderProgram);
-                    computeShaderProgram = 0;
                 }
             }
         }
@@ -370,7 +223,9 @@ void main()
             try
             {
                 if (initialized)
+                {
                     return true;
+                }
                 stitcher = new OpenGLStitcher();
                 this.tileCopy = tileCopy;
                 initialized = true;
@@ -407,8 +262,7 @@ void main()
                     pxheight,
                     viewX,
                     viewY,
-                    viewResolution,
-                    tileCopy
+                    viewResolution
                     );
             }
             catch (Exception ex)
@@ -425,15 +279,16 @@ void main()
             public int Height;
             public byte[] Bytes;
             public Extent Extent;
-            public GpuTile(TileInfo tf, byte[] bts)
+
+            /// <summary>
+            /// Create GpuTile with explicit dimensions (preferred for edge tiles)
+            /// </summary>
+            public GpuTile(TileInfo tf, byte[] bts, int width, int height)
             {
                 Index = tf.Index;
                 Extent = tf.Extent;
-                int w = (int)Math.Round(Math.Sqrt(bts.Length));
-                Width = w;
-                Height = w;
-                if(bts.Length != Width * Height * 4)
-                    throw new Exception("Tile byte array size does not match expected dimensions.");    
+                Width = width;
+                Height = height;
                 Bytes = bts;
             }
 
@@ -443,277 +298,226 @@ void main()
             }
         }
     }
-
-    // OpenGL rendering implementation
     internal class OpenGLStitcher
     {
-        private ShaderProgram shaderProgram;
-        private int framebuffer;
-        private int renderbuffer;
+        private int fbo;
+        private int colorTex;
         private int vao;
         private int vbo;
-        bool init = false;
-        private int currentFboWidth = -1;
-        private int currentFboHeight = -1;
+        private ShaderProgram shader;
+        private int width = -1;
+        private int height = -1;
 
         public OpenGLStitcher()
         {
-            if (!init)
+            InitGL();
+        }
+
+        private string VertexShader = @"
+#version 330 core
+layout(location=0) in vec2 aPos;
+layout(location=1) in vec2 aUV;
+
+uniform vec2 pos;
+uniform vec2 size;
+
+out vec2 uv;
+
+void main()
+{
+    vec2 p = aPos * size + pos;
+    gl_Position = vec4(p, 0, 1);
+    uv = aUV;
+}
+";
+
+        private string FragmentShader = @"
+#version 330 core
+in vec2 uv;
+out vec4 FragColor;
+uniform sampler2D tex;
+
+void main()
+{
+    FragColor = texture(tex, vec2(uv.x, 1.0 - uv.y));
+}
+";
+        private void InitGL()
+        {
+            shader = new ShaderProgram(VertexShader, FragmentShader);
+
+            float[] quad =
             {
-                InitializeOpenGL();
-                init = true;
-            }
-        }
+            // pos      uv
+            0, 0,       0, 0,
+            1, 0,       1, 0,
+            1, 1,       1, 1,
 
-        private void InitializeOpenGL()
-        {
-            if (shaderProgram != null)
-                return;
-            // Compile shaders
-            shaderProgram = new ShaderProgram(VertexShaderSource, FragmentShaderSource);
+            0, 0,       0, 0,
+            1, 1,       1, 1,
+            0, 1,       0, 1
+        };
 
-            // Create vertex array and buffer for quad
-            CreateQuadGeometry();
-
-            // Create framebuffer (will be resized on demand)
-            GL.GenFramebuffers(1, out framebuffer);
-            GL.GenRenderbuffers(1, out renderbuffer);
-        }
-
-        private void CreateQuadGeometry()
-        {
-            // Full-screen quad with texture coordinates
-            float[] quadVertices = {
-            // Position (x, y)  TexCoord (u, v)
-            -1.0f, -1.0f,       0.0f, 0.0f,
-                1.0f, -1.0f,       1.0f, 0.0f,
-                1.0f,  1.0f,       1.0f, 1.0f,
-
-            -1.0f, -1.0f,       0.0f, 0.0f,
-                1.0f,  1.0f,       1.0f, 1.0f,
-            -1.0f,  1.0f,       0.0f, 1.0f
-            };
-
-            GL.GenVertexArrays(1, out vao);
-            GL.GenBuffers(1, out vbo);
+            vao = GL.GenVertexArray();
+            vbo = GL.GenBuffer();
 
             GL.BindVertexArray(vao);
             GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, quadVertices.Length * sizeof(float),
-                quadVertices, BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ArrayBuffer, quad.Length * sizeof(float), quad, BufferUsageHint.StaticDraw);
 
-            // Position attribute
             GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 0);
             GL.EnableVertexAttribArray(0);
 
-            // TexCoord attribute
             GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 2 * sizeof(float));
             GL.EnableVertexAttribArray(1);
 
             GL.BindVertexArray(0);
         }
 
-        private void EnsureFramebufferSize(int width, int height)
+        private void EnsureFBO(int w, int h)
         {
-            if (currentFboWidth == width && currentFboHeight == height)
+            if (w == width && h == height)
                 return;
 
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            if (fbo != 0)
+            {
+                GL.DeleteFramebuffer(fbo);
+                GL.DeleteTexture(colorTex);
+            }
 
-            // Setup renderbuffer for color attachment
-            GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, renderbuffer);
-            GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer,
-                RenderbufferStorage.Rgba8, width, height);
-            GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer,
-                FramebufferAttachment.ColorAttachment0,
-                RenderbufferTarget.Renderbuffer, renderbuffer);
+            width = w;
+            height = h;
+
+            colorTex = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, colorTex);
+            GL.TexStorage2D(TextureTarget2d.Texture2D, 1, SizedInternalFormat.Rgba8, w, h);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+
+            fbo = GL.GenFramebuffer();
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                                    TextureTarget.Texture2D, colorTex, 0);
 
             var status = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
             if (status != FramebufferErrorCode.FramebufferComplete)
-            {
-                throw new Exception($"Framebuffer incomplete: {status}");
-            }
+                throw new Exception($"FBO incomplete: {status}");
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-
-            currentFboWidth = width;
-            currentFboHeight = height;
         }
-
         public byte[] Render(
-            List<TileInfo> tiles,
-            List<Stitch.GpuTile> gpuTiles,
-            TileTextureCache textureCache,
-            int pxwidth,
-            int pxheight,
-            double viewX,
-            double viewY,
-            double viewResolution,
-            TileCopyGL copy)
+    List<TileInfo> tiles,
+    List<Stitch.GpuTile> gpuTiles,
+    TileTextureCache textureCache,
+    int pxwidth,
+    int pxheight,
+    double viewX,
+    double viewY,
+    double viewResolution)
         {
-            // Ensure framebuffer matches viewport size
-            EnsureFramebufferSize(pxwidth, pxheight);
+            EnsureFBO(pxwidth, pxheight);
 
-            // Bind framebuffer and clear
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
             GL.Viewport(0, 0, pxwidth, pxheight);
-            GL.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            GL.ClearColor(0, 0, 0, 1);
             GL.Clear(ClearBufferMask.ColorBufferBit);
 
-            // Enable blending for proper compositing
             GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-            // Use shader program
-            shaderProgram.Use();
+            shader.Use();
             GL.BindVertexArray(vao);
 
-            // Render each tile
             foreach (var tile in tiles)
-            {
-                RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight,
-                    viewX, viewY, viewResolution, copy);
-            }
+                RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight, viewX, viewY, viewResolution);
 
-            // Read back pixels
-            byte[] viewportData = new byte[pxwidth * pxheight * 4];
-            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Rgba, PixelType.UnsignedByte, viewportData);
+            byte[] output = new byte[pxwidth * pxheight * 4];
+            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Bgra, PixelType.UnsignedByte, output);
 
-            // Cleanup
-            GL.BindVertexArray(0);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             GL.Disable(EnableCap.Blend);
 
-            return viewportData;
+            return output;
         }
-
         private void RenderTile(
-            TileInfo tile,
-            List<Stitch.GpuTile> gpuTiles,
-            TileTextureCache textureCache,
-            int pxwidth,
-            int pxheight,
-            double viewX,
-            double viewY,
-            double viewResolution, TileCopyGL tileCopy)
+    TileInfo tile,
+    List<Stitch.GpuTile> gpuTiles,
+    TileTextureCache textureCache,
+    int pxwidth,
+    int pxheight,
+    double viewX,
+    double viewY,
+    double viewResolution)
         {
-            if (tileCopy == null)
-                return;
-            // Find matching GPU tile
             var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
             if (gpuTile == null)
                 return;
-            
-            // Get texture from cache
-            int textureId = textureCache.GetTexture(tile.Index);
 
-            // Calculate tile position in viewport
-            int tileWidth = gpuTile.Width;
-            int tileHeight = gpuTile.Height;
-            int levelScale = 1 << tile.Index.Level;
+            if (!textureCache.HasTexture(tile.Index))
+                textureCache.UploadTexture(tile.Index, gpuTile.Bytes, gpuTile.Width, gpuTile.Height);
+
+            int tex = textureCache.GetTexture(tile.Index);
 
             var extentPx = tile.Extent.WorldToPixelInvertedY(viewResolution);
 
-            int offsetX = (int)Math.Floor(extentPx.MinX - viewX);
-            int offsetY = pxheight - (int)Math.Floor(extentPx.MaxY - viewY) - tileHeight * levelScale;
+            float x = (float)(extentPx.MinX - viewX);
+            float y = (float)(extentPx.MinY - viewY);
+            float w = (float)extentPx.Width;
+            float h = (float)extentPx.Height;
 
-            int scaledWidth = tileWidth * levelScale;
-            int scaledHeight = tileHeight * levelScale;
+            // Convert to normalized coords
+            float ndcX = (x / pxwidth) * 2f - 1f;
+            float ndcY = 1f - ((y + h) / pxheight) * 2f;
+            float ndcW = (w / pxwidth) * 2f;
+            float ndcH = (h / pxheight) * 2f;
 
-            tileCopy.CopyTileToCanvas(tileCopy.canvasTexture, pxwidth, pxheight, gpuTile.Bytes,tileWidth,tileHeight,offsetX,offsetY,scaledWidth,scaledHeight);
+            shader.SetUniform("pos", ndcX, ndcY);
+            shader.SetUniform("size", ndcW, ndcH);
+            shader.SetUniform("tex", 0);
 
-            // Convert to normalized device coordinates (-1 to 1)
-            float ndcX = (offsetX / (float)pxwidth) * 2.0f - 1.0f;
-            float ndcY = (offsetY / (float)pxheight) * 2.0f - 1.0f;
-            float ndcWidth = (scaledWidth / (float)pxwidth) * 2.0f;
-            float ndcHeight = (scaledHeight / (float)pxheight) * 2.0f;
-
-            // Set uniforms
-            shaderProgram.SetUniform("tileTexture", 0);
-            shaderProgram.SetUniform("position", ndcX, ndcY);
-            shaderProgram.SetUniform("size", ndcWidth, ndcHeight);
-
-            // Bind texture and draw
             GL.ActiveTexture(TextureUnit.Texture0);
-            GL.BindTexture(TextureTarget.Texture2D, textureId);
+            GL.BindTexture(TextureTarget.Texture2D, tex);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
-
         }
 
-        // Shader sources
-        private const string VertexShaderSource = @"
-#version 330 core
-layout (location = 0) in vec2 aPosition;
-layout (location = 1) in vec2 aTexCoord;
-
-uniform vec2 position;
-uniform vec2 size;
-
-out vec2 TexCoord;
-
-void main()
-{
-vec2 scaledPos = aPosition * size * 0.5 + position + size * 0.5;
-gl_Position = vec4(scaledPos, 0.0, 1.0);
-TexCoord = aTexCoord;
-}
-";
-
-        private const string FragmentShaderSource = @"
-#version 330 core
-in vec2 TexCoord;
-out vec4 FragColor;
-
-uniform sampler2D tileTexture;
-
-void main()
-{
-FragColor = texture(tileTexture, TexCoord);
-}
-";
     }
-
     // Texture cache management
     internal class TileTextureCache
     {
         private Dictionary<TileIndex, int> textureCache = new();
-
         public void UploadTexture(TileIndex index, byte[] pixelData, int width, int height)
         {
             if (textureCache.ContainsKey(index))
                 return;
-            int textureId;
-            GL.GenTextures(1, out textureId);
-            GL.BindTexture(TextureTarget.Texture2D, textureId);
 
-            int tw = (int)Math.Round(Math.Sqrt(pixelData.Length));
+            GL.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
-            // Upload pixel data
+            int tex = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, tex);
+
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8,
-                tw, tw, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixelData);
+                width, height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, pixelData);
 
-            // Set texture parameters
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
-                (int)TextureMinFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter,
-                (int)TextureMagFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS,
-                (int)TextureWrapMode.ClampToEdge);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT,
-                (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
 
-            GL.BindTexture(TextureTarget.Texture2D, 0);
-            textureCache.Add(index,textureId);
+            textureCache[index] = tex;
         }
 
         public int GetTexture(TileIndex index)
         {
-            bool t = textureCache.TryGetValue(index, out int tex);
-            if(!t)
-            textureCache.Add(index, textureCache.Count);
-            return tex;
+            if (textureCache.TryGetValue(index, out int tex))
+                return tex;
+            return 0;  // Texture not found - caller should handle this
         }
-        
+
+        public bool HasTexture(TileIndex index)
+        {
+            return textureCache.ContainsKey(index);
+        }
+
         public void ReleaseTexture(TileIndex index)
         {
             if (textureCache.TryGetValue(index, out int textureId))
@@ -760,7 +564,7 @@ FragColor = texture(tileTexture, TexCoord);
             {
                 Console.WriteLine(e.Message);
             }
-            
+
         }
 
         private int CompileShader(ShaderType type, string source)

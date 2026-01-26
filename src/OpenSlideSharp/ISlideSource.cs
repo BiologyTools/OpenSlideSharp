@@ -398,7 +398,7 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
@@ -451,12 +451,15 @@ namespace OpenSlideGTK
             }
             return null;
         }
+
         public byte[] GetSlice(SliceInfo sliceInfo)
         {
             if (stitch == null)
                 stitch = new Stitch();
             if (cache == null)
                 cache = new TileCache(this, 200);
+            if (stitch.tileCopy == null)
+                return null;
             var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
@@ -472,7 +475,7 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
@@ -525,6 +528,98 @@ namespace OpenSlideGTK
             }
             return null;
         }
+
+        /*
+        public byte[] GetSlice(SliceInfo sliceInfo)
+        {
+            if (stitch == null)
+                stitch = new Stitch();
+            if (cache == null)
+                cache = new TileCache(this, 200);
+            var curLevel = this.Schema.Resolutions[this.level];
+            var curUnitsPerPixel = sliceInfo.Resolution;
+            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
+            List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
+            this.FetchTilesAsync(tileInfos.ToList(), this.level, coord).Wait();
+            foreach (BruTile.TileInfo t in tileInfos)
+            {
+                byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level));
+                if (c != null)
+                {
+                    if (useGPU)
+                    {
+                        TileInfo tileInfo = new TileInfo();
+                        tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+                        tileInfo.Index = t.Index;
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
+                        tiles.Add(Tuple.Create(t.Extent, c));
+                    }
+                    else
+                        tiles.Add(Tuple.Create(t.Extent.WorldToPixelInvertedY(curUnitsPerPixel), c));
+                }
+            }
+
+            // Upload tiles to GPU stitch before rendering
+            foreach (BruTile.TileInfo t in tileInfos)
+            {
+                if (!stitch.HasTile(t))
+                {
+                    TileInformation tf = new TileInformation(t.Index, t.Extent, coord);
+                    byte[] tileData = cache.GetTile(new Info(coord, t.Index,t.Extent, t.Index.Level)).Result;
+                    if (tileData != null)
+                    {
+                        var gpuTile = new Stitch.GpuTile(t, tileData);
+                        stitch.AddTile(gpuTile);
+                    }
+                }
+            }
+
+            var srcPixelExtent = sliceInfo.Extent;
+            var dstPixelExtent = sliceInfo.Extent.WorldToPixelInvertedY(sliceInfo.Resolution);
+            var dstPixelHeight = sliceInfo.Parame.DstPixelHeight > 0 ? sliceInfo.Parame.DstPixelHeight : dstPixelExtent.Height;
+            var dstPixelWidth = sliceInfo.Parame.DstPixelWidth > 0 ? sliceInfo.Parame.DstPixelWidth : dstPixelExtent.Width;
+            destExtent = new Extent(0, 0, dstPixelWidth, dstPixelHeight);
+            sourceExtent = srcPixelExtent;
+            if (useGPU && stitch.gpuTiles.Count > 0)
+            {
+                try
+                {
+                    stitch.Initialize(stitch.tileCopy);
+                    if (tileInfos.Count() > 0 && stitch.initialized)
+                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel, stitch.tileCopy);
+                    else
+                    {
+                        return null;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message.ToString());
+                    UseVips = true;
+                    useGPU = false;
+                }
+            }
+            if (UseVips)
+            {
+                try
+                {
+                    NetVips.Image im;
+                    if (px == PixelFormat.Format32bppArgb)
+                        im = ImageUtil.JoinVipsRGB24(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    else
+                        im = ImageUtil.JoinVips16(tiles, srcPixelExtent, new Extent(0, 0, dstPixelWidth, dstPixelHeight));
+                    return im.WriteToMemory();
+                }
+                catch (Exception e)
+                {
+                    UseVips = false;
+                    Console.WriteLine("Failed to use LibVips please install Libvips for your platform.");
+                    Console.WriteLine(e.Message);
+                }
+            }
+            return null;
+        }
+        */
         public byte[] GetRgb24Bytes(Image<Rgb24> image)
         {
             if (image == null)
