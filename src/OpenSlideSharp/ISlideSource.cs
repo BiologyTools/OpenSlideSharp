@@ -181,21 +181,17 @@ namespace OpenSlideGTK
         public static ISlideSource Create(string source, bool enableCache = true)
         {
             var ext = Path.GetExtension(source).ToUpper();
-            
             try
             {
-                if (keyValuePairs.TryGetValue(ext, out var factory) && factory != null)
-                    return factory.Invoke(source, enableCache);
-
                 if (!string.IsNullOrEmpty(OpenSlideBase.DetectVendor(source)))
                 {
                     var osb = new OpenSlideBase(source, enableCache);
                     return osb;
                 }
             }
-            catch (Exception e) 
-            { 
-                Console.WriteLine(e.Message); 
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
             }
             return null;
         }
@@ -222,7 +218,7 @@ namespace OpenSlideGTK
         {
             get { return px; }
         }
-       
+
         public static byte[] SwapRedBlueChannels(byte[] imageData)
         {
             int bytesPerPixel = 3;
@@ -253,7 +249,7 @@ namespace OpenSlideGTK
 
         private int GetOptimalBatchSize()
         {
-            
+
             // Small viewport (< 800x600): fetch all tiles at once
             if (PyramidalSize.Width < 800 && PyramidalSize.Height < 600)
                 return 100;
@@ -288,7 +284,7 @@ namespace OpenSlideGTK
         // OPTIMIZATION 4: Smarter pyramid level selection
         // ============================================================================
 
-        private int GetOptimalPyramidLevel(double resolution, IDictionary<int,Resolution> ress)
+        private int GetOptimalPyramidLevel(double resolution, IDictionary<int, Resolution> ress)
         {
             // This should use your existing TileUtil.GetLevel() logic
             // but with awareness of viewport size
@@ -300,7 +296,7 @@ namespace OpenSlideGTK
             {
                 // 4K or larger - consider dropping one level for performance
                 level = Math.Min(level + 1, ress.Count - 1);
-            }      
+            }
             return level;
         }
 
@@ -355,20 +351,22 @@ namespace OpenSlideGTK
 
                     if (data == null)
                         continue;
-                        var info = new Info(
-                            coordinate,
-                            tile.Index,
-                            this.Schema.Extent,
-                            level
-                        );
-                    Info tf = new Info(coord, tile.Index, tile.Extent, level);
-                    cache.AddTile(tf, data);
+                    var info = new Info(
+                        coordinate,
+                        tile.Index,
+                        this.Schema.Extent,
+                        level
+                    );
+                    TileInfo tf = new TileInfo();
+                    tf.Index = tile.Index;
+                    tf.Extent = tile.Extent;
+                    stitch.AddTile(new Stitch.GpuTile(tf, data));
                 }
             }
         }
 
 
-        public void SetSliceInfo(int level,PixelFormat px,ZCT coord)
+        public void SetSliceInfo(int level, PixelFormat px, ZCT coord)
         {
             this.px = px;
             this.level = level;
@@ -379,13 +377,15 @@ namespace OpenSlideGTK
         {
             if (stitch == null)
                 stitch = new Stitch();
-            if(cache == null)
+            if (cache == null)
                 cache = new TileCache(this, 200);
             if (stitch.tileCopy == null)
                 return null;
             var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
+            if(tileInfos.Count()==0)
+                tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
             await this.FetchTilesAsync(tileInfos.ToList(), this.level, coord);
             foreach (BruTile.TileInfo t in tileInfos)
@@ -396,9 +396,9 @@ namespace OpenSlideGTK
                     if (useGPU)
                     {
                         TileInfo tileInfo = new TileInfo();
-                        tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
+                        tileInfo.Extent = t.Extent;
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
@@ -417,8 +417,8 @@ namespace OpenSlideGTK
                 try
                 {
                     stitch.Initialize(stitch.tileCopy);
-                    if(tileInfos.Count() > 0 && stitch.initialized)
-                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel, stitch.tileCopy);
+                    if (tileInfos.Count() > 0 && stitch.initialized)
+                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else
                     {
                         return null;
@@ -462,7 +462,7 @@ namespace OpenSlideGTK
                 return null;
             var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
-            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
+            var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
             this.FetchTilesAsync(tileInfos.ToList(), this.level, coord).Wait();
             foreach (BruTile.TileInfo t in tileInfos)
@@ -475,7 +475,7 @@ namespace OpenSlideGTK
                         TileInfo tileInfo = new TileInfo();
                         tileInfo.Extent = t.Extent.WorldToPixelInvertedY(curUnitsPerPixel);
                         tileInfo.Index = t.Index;
-                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c, sliceInfo.Parame.DstPixelWidth, sliceInfo.Parame.DstPixelHeight));
+                        stitch.AddTile(new Stitch.GpuTile(tileInfo, c));
                         tiles.Add(Tuple.Create(t.Extent, c));
                     }
                     else
@@ -495,7 +495,7 @@ namespace OpenSlideGTK
                 {
                     stitch.Initialize(stitch.tileCopy);
                     if (tileInfos.Count() > 0 && stitch.initialized)
-                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel, stitch.tileCopy);
+                        return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else
                     {
                         return null;

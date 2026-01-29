@@ -48,7 +48,6 @@ namespace OpenSlideGTK
             : base(gws, nws)
             {
                 InitializeShaders();
-
             }
 
             private void InitializeShaders()
@@ -171,7 +170,7 @@ void main()
 
                 private void GlWidget_Render(object o, RenderArgs args)
                 {
-                    
+
                 }
 
                 private void OnRealized(object sender, EventArgs e)
@@ -213,8 +212,7 @@ void main()
             if (HasTile(tfi.Index))
                 return;
             gpuTiles.Add(tfi);
-            textureCache.UploadTexture(tfi.Index, tfi.Bytes, tfi.Width, tfi.Height);
-            return;
+            textureCache.UploadTexture(tfi.Index, tfi.Bytes, 256, 256);
         }
 
         // Initialization
@@ -245,15 +243,12 @@ void main()
             int pxheight,
             double viewX,
             double viewY,
-            double viewResolution,
-            TileCopyGL tileCopy)
+            double viewResolution
+            )
         {
             try
             {
-                if (stitcher == null)
-                {
-                    stitcher = new OpenGLStitcher();
-                }
+                Initialize(tileCopy);
                 return stitcher.Render(
                     tiles,
                     gpuTiles,
@@ -275,20 +270,18 @@ void main()
         public class GpuTile
         {
             public TileIndex Index;
-            public int Width;
-            public int Height;
+            public const int Width = 256;
+            public const int Height = 256;
             public byte[] Bytes;
             public Extent Extent;
 
             /// <summary>
             /// Create GpuTile with explicit dimensions (preferred for edge tiles)
             /// </summary>
-            public GpuTile(TileInfo tf, byte[] bts, int width, int height)
+            public GpuTile(TileInfo tf, byte[] bts)
             {
                 Index = tf.Index;
                 Extent = tf.Extent;
-                Width = width;
-                Height = height;
                 Bytes = bts;
             }
 
@@ -406,39 +399,40 @@ void main()
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
         public byte[] Render(
-    List<TileInfo> tiles,
-    List<Stitch.GpuTile> gpuTiles,
-    TileTextureCache textureCache,
-    int pxwidth,
-    int pxheight,
-    double viewX,
-    double viewY,
-    double viewResolution)
-        {
-            EnsureFBO(pxwidth, pxheight);
+        List<TileInfo> tiles,
+        List<Stitch.GpuTile> gpuTiles,
+        TileTextureCache textureCache,
+        int pxwidth,
+        int pxheight,
+        double viewX,
+        double viewY,
+        double viewResolution)
+            {
+                EnsureFBO(pxwidth, pxheight);
 
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
-            GL.Viewport(0, 0, pxwidth, pxheight);
-            GL.ClearColor(0, 0, 0, 1);
-            GL.Clear(ClearBufferMask.ColorBufferBit);
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+                GL.Viewport(0, 0, pxwidth, pxheight);
+                GL.ClearColor(0, 0, 0, 1);
+                GL.Clear(ClearBufferMask.ColorBufferBit);
 
-            GL.Enable(EnableCap.Blend);
-            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                GL.Enable(EnableCap.Blend);
+                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-            shader.Use();
-            GL.BindVertexArray(vao);
+                shader.Use();
+                GL.BindVertexArray(vao);
 
-            foreach (var tile in tiles)
-                RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight, viewX, viewY, viewResolution);
+                foreach (var tile in tiles)
+                {
+                    RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight, viewX, viewY, viewResolution);
+                }
+                byte[] output = new byte[pxwidth * pxheight * 4];
+                GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Bgra, PixelType.UnsignedByte, output);
 
-            byte[] output = new byte[pxwidth * pxheight * 4];
-            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Bgra, PixelType.UnsignedByte, output);
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                GL.Disable(EnableCap.Blend);
 
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-            GL.Disable(EnableCap.Blend);
-
-            return output;
-        }
+                return output;
+            }
         private void RenderTile(
     TileInfo tile,
     List<Stitch.GpuTile> gpuTiles,
@@ -454,18 +448,26 @@ void main()
                 return;
 
             if (!textureCache.HasTexture(tile.Index))
-                textureCache.UploadTexture(tile.Index, gpuTile.Bytes, gpuTile.Width, gpuTile.Height);
+                textureCache.UploadTexture(tile.Index, gpuTile.Bytes, 256, 256);
 
             int tex = textureCache.GetTexture(tile.Index);
 
-            var extentPx = tile.Extent.WorldToPixelInvertedY(viewResolution);
+            // tile.Extent is already in pixel coordinates with OSM Y convention
+            // (Y=0 at top, negative values going down)
+            // Convert OSM Y to screen Y: screenY = -osmY
+            double tileLeftPx = tile.Extent.MinX;
+            double tileTopPx = -tile.Extent.MaxY;  // MaxY is less negative = top of tile
 
-            float x = (float)(extentPx.MinX - viewX);
-            float y = (float)(extentPx.MinY - viewY);
-            float w = (float)extentPx.Width;
-            float h = (float)extentPx.Height;
+            // viewX, viewY are in world units from Bio - convert to pixels
+            double viewXPx = viewX / viewResolution;
+            double viewYPx = viewY / viewResolution;
 
-            // Convert to normalized coords
+            float x = (float)(tileLeftPx - viewXPx);
+            float y = (float)(tileTopPx - viewYPx);
+            float w = (float)tile.Extent.Width;
+            float h = (float)tile.Extent.Height;
+
+            // Convert to normalized device coords
             float ndcX = (x / pxwidth) * 2f - 1f;
             float ndcY = 1f - ((y + h) / pxheight) * 2f;
             float ndcW = (w / pxwidth) * 2f;
