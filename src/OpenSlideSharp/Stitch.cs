@@ -443,6 +443,7 @@ void main()
     double viewY,
     double viewResolution)
         {
+            tile.Extent = tile.Extent.WorldToPixelInvertedY(viewResolution);
             var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
             if (gpuTile == null)
                 return;
