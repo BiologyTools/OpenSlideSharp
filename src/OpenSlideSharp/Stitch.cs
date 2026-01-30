@@ -308,21 +308,31 @@ void main()
 
         private string VertexShader = @"
 #version 330 core
+
 layout(location=0) in vec2 aPos;
 layout(location=1) in vec2 aUV;
 
-uniform vec2 pos;
-uniform vec2 size;
+uniform vec2 pos;   // pixel-space top-left of tile
+uniform vec2 size;  // pixel-space size of tile
+uniform vec2 viewportSize; // (pxwidth, pxheight)
 
 out vec2 uv;
 
 void main()
 {
-    vec2 p = aPos * size + pos;
-    gl_Position = vec4(p, 0, 1);
+    // aPos is in [0,1]x[0,1]
+    vec2 pixelPos = aPos * size + pos;
+
+    // Convert from pixel (0..viewportSize) to NDC (-1..1), Y down to Y up
+    vec2 ndc;
+    ndc.x = (pixelPos.x / viewportSize.x) * 2.0 - 1.0;
+    ndc.y = 1.0 - (pixelPos.y / viewportSize.y) * 2.0;
+
+    gl_Position = vec4(ndc, 0.0, 1.0);
     uv = aUV;
 }
 ";
+
 
         private string FragmentShader = @"
 #version 330 core
@@ -399,40 +409,41 @@ void main()
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
         public byte[] Render(
-        List<TileInfo> tiles,
-        List<Stitch.GpuTile> gpuTiles,
-        TileTextureCache textureCache,
-        int pxwidth,
-        int pxheight,
-        double viewX,
-        double viewY,
-        double viewResolution)
+    List<TileInfo> tiles,
+    List<Stitch.GpuTile> gpuTiles,
+    TileTextureCache textureCache,
+    int pxwidth,
+    int pxheight,
+    double viewX,
+    double viewY,
+    double viewResolution)
+        {
+            EnsureFBO(pxwidth, pxheight);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+            GL.Viewport(0, 0, pxwidth, pxheight);
+            GL.ClearColor(0, 0, 0, 1);
+            GL.Clear(ClearBufferMask.ColorBufferBit);
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+            shader.Use();
+            GL.BindVertexArray(vao);
+
+            // New: tell shader the viewport size in pixels
+            shader.SetUniform("viewportSize", (float)pxwidth, (float)pxheight);
+
+            foreach (var tile in tiles)
             {
-                EnsureFBO(pxwidth, pxheight);
-
-                GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
-                GL.Viewport(0, 0, pxwidth, pxheight);
-                GL.ClearColor(0, 0, 0, 1);
-                GL.Clear(ClearBufferMask.ColorBufferBit);
-
-                GL.Enable(EnableCap.Blend);
-                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-                shader.Use();
-                GL.BindVertexArray(vao);
-
-                foreach (var tile in tiles)
-                {
-                    RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight, viewX, viewY, viewResolution);
-                }
-                byte[] output = new byte[pxwidth * pxheight * 4];
-                GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Bgra, PixelType.UnsignedByte, output);
-
-                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-                GL.Disable(EnableCap.Blend);
-
-                return output;
+                RenderTile(tile, gpuTiles, textureCache, pxwidth, pxheight, viewX, viewY, viewResolution);
             }
+
+            byte[] output = new byte[pxwidth * pxheight * 4];
+            GL.ReadPixels(0, 0, pxwidth, pxheight, PixelFormat.Bgra, PixelType.UnsignedByte, output);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            GL.Disable(EnableCap.Blend);
+            return output;
+        }
+
         private void RenderTile(
     TileInfo tile,
     List<Stitch.GpuTile> gpuTiles,
@@ -443,45 +454,43 @@ void main()
     double viewY,
     double viewResolution)
         {
-            tile.Extent = tile.Extent.WorldToPixelInvertedY(viewResolution);
+            // Convert world extent to pixel extent with inverted Y once
+            var pixelExtent = tile.Extent.WorldToPixelInvertedY(viewResolution);
+
             var gpuTile = gpuTiles.FirstOrDefault(t => t.Index == tile.Index);
             if (gpuTile == null)
                 return;
 
             if (!textureCache.HasTexture(tile.Index))
-                textureCache.UploadTexture(tile.Index, gpuTile.Bytes, 256, 256);
+                textureCache.UploadTexture(tile.Index, gpuTile.Bytes, Stitch.GpuTile.Width, Stitch.GpuTile.Height);
 
             int tex = textureCache.GetTexture(tile.Index);
+            if (tex == 0)
+                return;
 
-            // tile.Extent is already in pixel coordinates with OSM Y convention
-            // (Y=0 at top, negative values going down)
-            // Convert OSM Y to screen Y: screenY = -osmY
-            double tileLeftPx = tile.Extent.MinX;
-            double tileTopPx = -tile.Extent.MaxY;  // MaxY is less negative = top of tile
+            // pixel extent top-left relative to viewport
+            double tileLeftPx = pixelExtent.MinX;
+            double tileTopPx = -pixelExtent.MaxY; // because WorldToPixelInvertedY flipped Y
 
-            // viewX, viewY are in world units from Bio - convert to pixels
             double viewXPx = viewX / viewResolution;
             double viewYPx = viewY / viewResolution;
 
             float x = (float)(tileLeftPx - viewXPx);
             float y = (float)(tileTopPx - viewYPx);
-            float w = (float)tile.Extent.Width;
-            float h = (float)tile.Extent.Height;
 
-            // Convert to normalized device coords
-            float ndcX = (x / pxwidth) * 2f - 1f;
-            float ndcY = 1f - ((y + h) / pxheight) * 2f;
-            float ndcW = (w / pxwidth) * 2f;
-            float ndcH = (h / pxheight) * 2f;
+            float w = (float)pixelExtent.Width;
+            float h = (float)pixelExtent.Height;
 
-            shader.SetUniform("pos", ndcX, ndcY);
-            shader.SetUniform("size", ndcW, ndcH);
+            // Pass pure pixel-space position & size
+            shader.SetUniform("pos", x, y);
+            shader.SetUniform("size", w, h);
             shader.SetUniform("tex", 0);
 
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture2D, tex);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
+
 
     }
     // Texture cache management
