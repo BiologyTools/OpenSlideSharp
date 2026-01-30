@@ -86,6 +86,7 @@ namespace OpenSlideGTK
             if (_enableCache && _tileCache.Find(tileInfo.Index) is byte[] output)
                 return output;
             var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
+            
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
             var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
             var curLevelOffsetXPixel = tileInfo.Extent.MinX / MinUnitsPerPixel;

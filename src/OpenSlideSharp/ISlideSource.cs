@@ -373,7 +373,7 @@ namespace OpenSlideGTK
             this.coord = coord;
         }
 
-        public async Task<byte[]> GetSliceAsync(SliceInfo sliceInfo)
+        public async Task<byte[]> GetSliceAsync(SliceInfo sliceInfo, int level)
         {
             if (stitch == null)
                 stitch = new Stitch();
@@ -381,13 +381,13 @@ namespace OpenSlideGTK
                 cache = new TileCache(this, 200);
             if (stitch.tileCopy == null)
                 return null;
-            var curLevel = this.Schema.Resolutions[this.level];
+            var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
             if(tileInfos.Count()==0)
                 tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
-            await this.FetchTilesAsync(tileInfos.ToList(), this.level, coord);
+            await this.FetchTilesAsync(tileInfos.ToList(), level, coord);
             foreach (BruTile.TileInfo t in tileInfos)
             {
                 byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level));
