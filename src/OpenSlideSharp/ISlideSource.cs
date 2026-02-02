@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
 using static OpenSlideGTK.OpenSlideImage;
 using PixelFormat = AForge.PixelFormat;
@@ -25,12 +26,11 @@ namespace OpenSlideGTK
             this.capacity = capacity;
         }
 
-        public TValue Get(Info key)
+        public TValue Get(Info ke)
         {
             foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
             {
-                Info k = item.Value.key;
-                if (k.Coordinate == key.Coordinate && k.Index == key.Index)
+                if (ke.Coordinate == item.Value.key.Coordinate && ke.Index == item.Value.key.Index)
                 {
                     lruList.Remove(item);
                     lruList.AddLast(item);
@@ -108,7 +108,15 @@ namespace OpenSlideGTK
                 AddTile(inf, tile);
             return tile;
         }
-
+        public bool HasTile(Info inf)
+        {
+            byte[] data = cache.Get(inf);
+            if (data != null)
+            {
+                return true;
+            }
+            return false;
+        }
         public byte[] GetTileSync(Info inf)
         {
             byte[] data = cache.Get(inf);
@@ -135,7 +143,7 @@ namespace OpenSlideGTK
                 TileInfo tf = new TileInfo();
                 tf.Index = tileId.Index;
                 tf.Extent = tileId.Extent;
-                return await source.GetTileAsync(tf);
+                return await source.GetTileAsync(tf, tileId.Coordinate);
             }
             catch (Exception e)
             {
@@ -198,16 +206,36 @@ namespace OpenSlideGTK
         #endregion
 
         public abstract byte[] GetTile(TileInfo tileInfo);
+        public async Task<byte[]> GetTileAsync(BruTile.TileInfo tileInfo, ZCT coord)
+        {
+            if (tileInfo == null)
+                return null;
+            if (cache == null)
+                cache = new TileCache(this);
+            if (cache.HasTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level)))
+            {
+                return await cache.GetTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level));
+            }
+            var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
+            var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
+            var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
+            var curLevelOffsetXPixel = tileInfo.Extent.MinX / Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
+            var curLevelOffsetYPixel = -tileInfo.Extent.MaxY / Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
+            var curTileWidth = (int)(tileInfo.Extent.MaxX > Schema.Extent.Width ? tileWidth - (tileInfo.Extent.MaxX - Schema.Extent.Width) / r : tileWidth);
+            var curTileHeight = (int)(-tileInfo.Extent.MinY > Schema.Extent.Height ? tileHeight - (-tileInfo.Extent.MinY - Schema.Extent.Height) / r : tileHeight);
 
-        public abstract Task<byte[]> GetTileAsync(TileInfo tileInfo);
-
+            var bgraData = Image.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, curTileWidth, curTileHeight);
+            cache.AddTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level), bgraData);
+            return bgraData;
+        }
         public double MinUnitsPerPixel { get; protected set; }
         public static byte[] LastSlice;
         public static Extent destExtent;
         public static Extent sourceExtent;
         public static double curUnitsPerPixel = 1;
-        private int level;
-        private ZCT coord;
+        public OpenSlideImage Image;
+        //private int level;
+        //private ZCT coord;
         public static bool UseVips = true;
         public static bool useGPU = true;
         public Stitch stitch;
@@ -217,34 +245,6 @@ namespace OpenSlideGTK
         public PixelFormat PixelFormat
         {
             get { return px; }
-        }
-
-        public static byte[] SwapRedBlueChannels(byte[] imageData)
-        {
-            int bytesPerPixel = 3;
-            if (bytesPerPixel < 3)
-                throw new ArgumentException("The image must have at least 3 bytes per pixel (RGB).");
-
-            // Create a new array to store the swapped channel data
-            byte[] swappedData = new byte[imageData.Length];
-
-            for (int i = 0; i < imageData.Length; i += bytesPerPixel)
-            {
-                // Copy the green channel as is
-                swappedData[i + 1] = imageData[i + 1]; // Green channel stays the same
-
-                // Swap the red and blue channels
-                swappedData[i] = imageData[i + 2];     // Red channel gets Blue's value
-                swappedData[i + 2] = imageData[i];     // Blue channel gets Red's value
-
-                // If there are more bytes per pixel (like an alpha channel), copy the rest as is
-                for (int j = 3; j < bytesPerPixel; j++)
-                {
-                    swappedData[i + j] = imageData[i + j]; // Copy other channels if any (like alpha)
-                }
-            }
-
-            return swappedData;
         }
 
         private int GetOptimalBatchSize()
@@ -290,7 +290,7 @@ namespace OpenSlideGTK
             // but with awareness of viewport size
             // For small viewports, can use higher detail levels
             // For large viewports, might need to drop to lower detail to maintain performance
-            level = TileUtil.GetLevel(ress, resolution);
+            int level = TileUtil.GetLevel(ress, resolution);
             // Adaptive level adjustment based on viewport size
             if (PyramidalSize.Width > 2560 || PyramidalSize.Height > 1440)
             {
@@ -364,16 +364,7 @@ namespace OpenSlideGTK
                 }
             }
         }
-
-
-        public void SetSliceInfo(int level, PixelFormat px, ZCT coord)
-        {
-            this.px = px;
-            this.level = level;
-            this.coord = coord;
-        }
-
-        public async Task<byte[]> GetSliceAsync(SliceInfo sliceInfo, int level)
+        public async Task<byte[]> GetSliceAsync(SliceInfo sliceInfo, int level, ZCT coordinate)
         {
             if (stitch == null)
                 stitch = new Stitch();
@@ -387,10 +378,10 @@ namespace OpenSlideGTK
             if(tileInfos.Count()==0)
                 tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
-            await this.FetchTilesAsync(tileInfos.ToList(), level, coord);
+            await this.FetchTilesAsync(tileInfos.ToList(), level, coordinate);
             foreach (BruTile.TileInfo t in tileInfos)
             {
-                byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level));
+                byte[] c = cache.GetTileSync(new Info(coordinate, t.Index, t.Extent, level));
                 if (c != null)
                 {
                     if (useGPU)
@@ -452,7 +443,7 @@ namespace OpenSlideGTK
             return null;
         }
 
-        public byte[] GetSlice(SliceInfo sliceInfo)
+        public byte[] GetSlice(SliceInfo sliceInfo, ZCT coord, int level)
         {
             if (stitch == null)
                 stitch = new Stitch();
@@ -460,11 +451,11 @@ namespace OpenSlideGTK
                 cache = new TileCache(this, 200);
             if (stitch.tileCopy == null)
                 return null;
-            var curLevel = this.Schema.Resolutions[this.level];
+            var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
             List<Tuple<Extent, byte[]>> tiles = new List<Tuple<Extent, byte[]>>();
-            this.FetchTilesAsync(tileInfos.ToList(), this.level, coord).Wait();
+            this.FetchTilesAsync(tileInfos.ToList(), level, coord).Wait();
             foreach (BruTile.TileInfo t in tileInfos)
             {
                 byte[] c = cache.GetTileSync(new Info(coord, t.Index, t.Extent, level));
@@ -701,6 +692,7 @@ namespace OpenSlideGTK
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+
         #endregion
     }
 
@@ -747,7 +739,7 @@ namespace OpenSlideGTK
         /// </summary>
         /// <param name="sliceInfo">Slice info</param>
         /// <returns></returns>
-        byte[] GetSlice(SliceInfo sliceInfo);
+        byte[] GetSlice(SliceInfo sliceInfo, ZCT coord, int level);
     }
 
     /// <summary>

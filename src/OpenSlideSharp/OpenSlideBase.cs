@@ -117,7 +117,7 @@ namespace OpenSlideGTK
             return rgbArray;
         }
 
-        public override async Task<byte[]> GetTileAsync(TileInfo tileInfo)
+        public async Task<byte[]> GetTileAsync(TileInfo tileInfo)
         {
             return GetTile(tileInfo);
         }

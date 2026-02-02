@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace OpenSlideGTK
 {
     /// <summary>
-    /// openslide warpper
+    /// openslide wrapper
     /// </summary>
     public partial class OpenSlideImage : IDisposable
     {
@@ -176,7 +176,7 @@ namespace OpenSlideGTK
                         Index = tileId.Index,
                         Extent = tileId.Extent,
                     };
-                    return await source.GetTileAsync(tf);
+                    return await source.GetTileAsync(tf, tileId.Coordinate);
                 }
                 catch (Exception e)
                 {

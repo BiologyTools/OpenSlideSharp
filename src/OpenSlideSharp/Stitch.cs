@@ -409,14 +409,14 @@ void main()
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
         public byte[] Render(
-    List<TileInfo> tiles,
-    List<Stitch.GpuTile> gpuTiles,
-    TileTextureCache textureCache,
-    int pxwidth,
-    int pxheight,
-    double viewX,
-    double viewY,
-    double viewResolution)
+        List<TileInfo> tiles,
+        List<Stitch.GpuTile> gpuTiles,
+        TileTextureCache textureCache,
+        int pxwidth,
+        int pxheight,
+        double viewX,
+        double viewY,
+        double viewResolution)  
         {
             EnsureFBO(pxwidth, pxheight);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -445,14 +445,14 @@ void main()
         }
 
         private void RenderTile(
-    TileInfo tile,
-    List<Stitch.GpuTile> gpuTiles,
-    TileTextureCache textureCache,
-    int pxwidth,
-    int pxheight,
-    double viewX,
-    double viewY,
-    double viewResolution)
+        TileInfo tile,
+        List<Stitch.GpuTile> gpuTiles,
+        TileTextureCache textureCache,
+        int pxwidth,
+        int pxheight,
+        double viewX,
+        double viewY,
+        double viewResolution)
         {
             // Convert world extent to pixel extent with inverted Y once
             var pixelExtent = tile.Extent.WorldToPixelInvertedY(viewResolution);
