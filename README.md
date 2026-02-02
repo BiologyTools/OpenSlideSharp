@@ -12,7 +12,7 @@ Thank you to @yigolden for his work on [OpenSlideNET](https://github.com/yigolde
 
 Nuget    
 ```ps
-Install-Package OpenSlideGTK -Version 2.4.0
+Install-Package OpenSlideGTK -Version 2.5.0
 ```
 
 ## Index
