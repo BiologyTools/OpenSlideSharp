@@ -32,155 +32,7 @@ namespace OpenSlideGTK
         private TileTextureCache textureCache = new TileTextureCache();
         public bool initialized = false;
         public List<GpuTile> gpuTiles = new();
-        public TileCopyGL tileCopy;
-        public class TileCopyGL : GameWindow
-        {
-            private int computeShaderProgram;
-            private int computeShader;
-
-            // Uniform locations
-            private int canvasWidthLocation;
-            private int canvasHeightLocation;
-            private int offsetXLocation;
-            private int offsetYLocation;
-            public int canvasTexture;
-            public TileCopyGL(GameWindowSettings gws, NativeWindowSettings nws)
-            : base(gws, nws)
-            {
-                InitializeShaders();
-            }
-
-            private void InitializeShaders()
-            {
-                // Create compute shader
-                //if (glArea.Error != null)
-                //    throw new Exception("OpenGL context creation failed");
-                computeShader = GL.CreateShader(ShaderType.ComputeShader);
-
-                // Load shader source
-                string shaderSource = LoadShaderSource("tile_copy.comp");
-                GL.ShaderSource(computeShader, shaderSource);
-                GL.CompileShader(computeShader);
-
-                // Check compilation errors
-                GL.GetShader(computeShader, ShaderParameter.CompileStatus, out int success);
-                if (success == 0)
-                {
-                    string infoLog = GL.GetShaderInfoLog(computeShader);
-                    throw new Exception($"Compute shader compilation failed: {infoLog}");
-                }
-
-                // Create program
-                computeShaderProgram = GL.CreateProgram();
-                GL.AttachShader(computeShaderProgram, computeShader);
-                GL.LinkProgram(computeShaderProgram);
-
-                // Check linking errors
-                GL.GetProgram(computeShaderProgram, GetProgramParameterName.LinkStatus, out success);
-                if (success == 0)
-                {
-                    string infoLog = GL.GetProgramInfoLog(computeShaderProgram);
-                    throw new Exception($"Shader program linking failed: {infoLog}");
-                }
-
-                // Get uniform locations
-                canvasWidthLocation = GL.GetUniformLocation(computeShaderProgram, "canvasWidth");
-                canvasHeightLocation = GL.GetUniformLocation(computeShaderProgram, "canvasHeight");
-                offsetXLocation = GL.GetUniformLocation(computeShaderProgram, "offsetX");
-                offsetYLocation = GL.GetUniformLocation(computeShaderProgram, "offsetY");
-                canvasTexture = CreateCanvasTexture(ClientRectangle.Size.X, ClientRectangle.Size.Y);
-            }
-
-            private string LoadShaderSource(string filename)
-            {
-                // Load from embedded resource or file
-                string path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filename);
-                if (System.IO.File.Exists(path))
-                {
-                    return System.IO.File.ReadAllText(path);
-                }
-
-                // Embedded shader source as fallback
-                return @"
-#version 430
-layout(local_size_x = 16, local_size_y = 16) in;
-
-layout(rgba8, binding = 0) uniform readonly image2D tile;
-layout(rgba8, binding = 1) uniform writeonly image2D canvas;
-
-uniform int canvasWidth;
-uniform int canvasHeight;
-uniform int offsetX;
-uniform int offsetY;
-
-void main()
-{
-    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
-
-    ivec2 canvasPos = id + ivec2(offsetX, offsetY);
-
-    if (canvasPos.x < 0 || canvasPos.y < 0 ||
-        canvasPos.x >= canvasWidth || canvasPos.y >= canvasHeight)
-        return;
-
-    vec4 pixel = imageLoad(tile, id);
-    imageStore(canvas, canvasPos, pixel);
-}"
-;
-            }
-
-
-            /// <summary>
-            /// Create a canvas texture
-            /// </summary>
-            public int CreateCanvasTexture(int width, int height)
-            {
-                int texture = GL.GenTexture();
-                GL.BindTexture(TextureTarget.Texture2D, texture);
-
-                GL.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    PixelInternalFormat.Rgba8,
-                    width,
-                    height,
-                    0,
-                    PixelFormat.Bgra,
-                    PixelType.UnsignedByte,
-                    IntPtr.Zero);
-
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-
-                return texture;
-            }
-
-            public class GlWidget : GLArea
-            {
-                private bool initialized;
-
-                public GlWidget()
-                {
-                    HasDepthBuffer = true;
-                    AutoRender = true;
-
-                    Realized += OnRealized;
-                    Render += GlWidget_Render;
-                }
-
-                private void GlWidget_Render(object o, RenderArgs args)
-                {
-
-                }
-
-                private void OnRealized(object sender, EventArgs e)
-                {
-                    MakeCurrent();
-
-                }
-            }
-        }
-
+        
         // Public tile query methods
         public bool HasTile(TileIndex ex)
         {
@@ -216,7 +68,7 @@ void main()
         }
 
         // Initialization
-        public bool Initialize(Stitch.TileCopyGL tileCopy)
+        public bool Initialize()
         {
             try
             {
@@ -225,7 +77,6 @@ void main()
                     return true;
                 }
                 stitcher = new OpenGLStitcher();
-                this.tileCopy = tileCopy;
                 initialized = true;
                 return true;
             }
@@ -248,7 +99,7 @@ void main()
         {
             try
             {
-                Initialize(tileCopy);
+                Initialize();
                 return stitcher.Render(
                     tiles,
                     gpuTiles,
@@ -332,8 +183,6 @@ void main()
     uv = aUV;
 }
 ";
-
-
         private string FragmentShader = @"
 #version 330 core
 in vec2 uv;

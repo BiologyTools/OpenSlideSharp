@@ -370,8 +370,6 @@ namespace OpenSlideGTK
                 stitch = new Stitch();
             if (cache == null)
                 cache = new TileCache(this, 200);
-            if (stitch.tileCopy == null)
-                return null;
             var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
@@ -407,7 +405,6 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    stitch.Initialize(stitch.tileCopy);
                     if (tileInfos.Count() > 0 && stitch.initialized)
                         return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else
@@ -449,8 +446,6 @@ namespace OpenSlideGTK
                 stitch = new Stitch();
             if (cache == null)
                 cache = new TileCache(this, 200);
-            if (stitch.tileCopy == null)
-                return null;
             var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
@@ -484,7 +479,6 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    stitch.Initialize(stitch.tileCopy);
                     if (tileInfos.Count() > 0 && stitch.initialized)
                         return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
                     else
