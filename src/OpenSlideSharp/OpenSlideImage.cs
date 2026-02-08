@@ -1,13 +1,18 @@
 ﻿using AForge;
 using BruTile;
+using GLib;
+using ManagedCuda.BasicTypes;
 using OpenSlideGTK.Interop;
+using Pango;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace OpenSlideGTK
 {
@@ -39,10 +44,29 @@ namespace OpenSlideGTK
         public static string DetectVendor(string filename)
         {
             if (NativeMethods.isWindows)
-                return NativeMethods.Windows.DetectVendor(filename);
+            {
+               return NativeMethods.Windows.DetectVendor(filename);
+            }
             else if (NativeMethods.isLinux)
-                return NativeMethods.Linux.DetectVendor(filename);
-            else return NativeMethods.OSX.DetectVendor(filename);
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    return NativeMethods.LinuxX64.DetectVendor(filename);
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    return NativeMethods.LinuxX64.DetectVendor(filename);
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if(NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    return NativeMethods.OSXx64.DetectVendor(filename);
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    return NativeMethods.OSXarm.DetectVendor(filename);
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
         /// <summary>
         /// 
@@ -220,12 +244,31 @@ namespace OpenSlideGTK
         /// <exception cref="OpenSlideException"/>
         public static OpenSlideImage Open(string filename)
         {
+
             if (NativeMethods.isWindows)
+            {
                 return new OpenSlideImage(NativeMethods.Windows.Open(filename));
+            }
             else if (NativeMethods.isLinux)
-                return new OpenSlideImage(NativeMethods.Linux.Open(filename));
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    return new OpenSlideImage(NativeMethods.LinuxX64.Open(filename));
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    return new OpenSlideImage(NativeMethods.Linuxarm.Open(filename));
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    return new OpenSlideImage(NativeMethods.OSXx64.Open(filename));
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    return new OpenSlideImage(NativeMethods.OSXarm.Open(filename));
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
             else
-                return new OpenSlideImage(NativeMethods.OSX.Open(filename));
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -241,16 +284,39 @@ namespace OpenSlideGTK
                 {
                     var result = NativeMethods.Windows.GetLevelCount(Handle);
                     return result != -1 ? result : CheckIfThrow(result);
-                } else if (NativeMethods.isLinux)
+                }
+                else if (NativeMethods.isLinux)
                 {
-                    var result = NativeMethods.Linux.GetLevelCount(Handle);
-                    return result != -1 ? result : CheckIfThrow(result);
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        var result = NativeMethods.LinuxX64.GetLevelCount(Handle);
+                        return result != -1 ? result : CheckIfThrow(result);
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        var result = NativeMethods.LinuxX64.GetLevelCount(Handle);
+                        return result != -1 ? result : CheckIfThrow(result);
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                }
+                else if (NativeMethods.isOSX)
+                {
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        var result = NativeMethods.OSXx64.GetLevelCount(Handle);
+                        return result != -1 ? result : CheckIfThrow(result);
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        var result = NativeMethods.OSXarm.GetLevelCount(Handle);
+                        return result != -1 ? result : CheckIfThrow(result);
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                 }
                 else
-                {
-                    var result = NativeMethods.OSX.GetLevelCount(Handle);
-                    return result != -1 ? result : CheckIfThrow(result);
-                }
+                    throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
             }
         }
 
@@ -355,16 +421,40 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                ImageDimension dimensions = new ImageDimension();
-                NativeMethods.Linux.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
-                return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    ImageDimension dimensions = new ImageDimension();
+                    NativeMethods.LinuxX64.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
+                    return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    ImageDimension dimensions = new ImageDimension();
+                    NativeMethods.Linuxarm.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
+                    return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    ImageDimension dimensions = new ImageDimension();
+                    NativeMethods.OSXx64.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
+                    return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    ImageDimension dimensions = new ImageDimension();
+                    NativeMethods.OSXarm.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
+                    return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                ImageDimension dimensions = new ImageDimension();
-                NativeMethods.OSX.GetLevelDimensions(Handle, level, out dimensions.width, out dimensions.height);
-                return dimensions.Height >= 0 && dimensions.Width >= 0 ? dimensions : CheckIfThrow(dimensions);
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -396,16 +486,39 @@ namespace OpenSlideGTK
             {
                 var result = NativeMethods.Windows.GetLevelDownsample(Handle, level);
                 return result != -1.0d ? result : CheckIfThrow(result);
-            } else if (NativeMethods.isLinux)
+            }
+            else if (NativeMethods.isLinux)
             {
-                var result = NativeMethods.Linux.GetLevelDownsample(Handle, level);
-                return result != -1.0d ? result : CheckIfThrow(result);
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var result = NativeMethods.LinuxX64.GetLevelDownsample(Handle, level);
+                    return result != -1.0d ? result : CheckIfThrow(result);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var result = NativeMethods.Linuxarm.GetLevelDownsample(Handle, level);
+                    return result != -1.0d ? result : CheckIfThrow(result);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var result = NativeMethods.OSXx64.GetLevelDownsample(Handle, level);
+                    return result != -1.0d ? result : CheckIfThrow(result);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var result = NativeMethods.OSXarm.GetLevelDownsample(Handle, level);
+                    return result != -1.0d ? result : CheckIfThrow(result);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                var result = NativeMethods.OSX.GetLevelDownsample(Handle, level);
-                return result != -1.0d ? result : CheckIfThrow(result);
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -420,16 +533,39 @@ namespace OpenSlideGTK
             {
                 var result = NativeMethods.Windows.GetBestLevelForDownsample(Handle, downsample);
                 return result != -1 ? result : CheckIfThrow(result);
-            } else if (NativeMethods.isLinux)
+            }
+            else if (NativeMethods.isLinux)
             {
-                var result = NativeMethods.Linux.GetBestLevelForDownsample(Handle, downsample);
-                return result != -1 ? result : CheckIfThrow(result);
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var result = NativeMethods.LinuxX64.GetBestLevelForDownsample(Handle, downsample);
+                    return result != -1 ? result : CheckIfThrow(result);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var result = NativeMethods.Linuxarm.GetBestLevelForDownsample(Handle, downsample);
+                    return result != -1 ? result : CheckIfThrow(result);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var result = NativeMethods.OSXx64.GetBestLevelForDownsample(Handle, downsample);
+                    return result != -1 ? result : CheckIfThrow(result);
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var result = NativeMethods.OSXarm.GetBestLevelForDownsample(Handle, downsample);
+                    return result != -1 ? result : CheckIfThrow(result);
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                var result = NativeMethods.OSX.GetBestLevelForDownsample(Handle, downsample);
-                return result != -1 ? result : CheckIfThrow(result);
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -449,6 +585,7 @@ namespace OpenSlideGTK
                 throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0)
                 throw new ArgumentOutOfRangeException(nameof(height));
+
             if (NativeMethods.isWindows)
             {
                 var data = new byte[width * height * 4];
@@ -458,19 +595,44 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                var data = new byte[width * height * 4];
-                NativeMethods.Linux.ReadRegion(Handle, data, x, y, level, width, height);
-                CheckIfThrow(0);
-                return data;
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var data = new byte[width * height * 4];
+                    NativeMethods.LinuxX64.ReadRegion(Handle, data, x, y, level, width, height);
+                    CheckIfThrow(0);
+                    return data;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var data = new byte[width * height * 4];
+                    NativeMethods.Linuxarm.ReadRegion(Handle, data, x, y, level, width, height);
+                    CheckIfThrow(0);
+                    return data;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var data = new byte[width * height * 4];
+                    NativeMethods.OSXx64.ReadRegion(Handle, data, x, y, level, width, height);
+                    CheckIfThrow(0);
+                    return data;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var data = new byte[width * height * 4];
+                    NativeMethods.OSXarm.ReadRegion(Handle, data, x, y, level, width, height);
+                    CheckIfThrow(0);
+                    return data;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                var data = new byte[width * height * 4];
-                NativeMethods.OSX.ReadRegion(Handle, data, x, y, level, width, height);
-                CheckIfThrow(0);
-                return data;
-            }
-
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -488,6 +650,7 @@ namespace OpenSlideGTK
             data = null;
             if (width <= 0) return false;
             if (height <= 0) return false;
+
             if (NativeMethods.isWindows)
             {
                 data = new byte[width * height * 4];
@@ -498,20 +661,49 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                data = new byte[width * height * 4];
-                NativeMethods.Linux.ReadRegion(Handle, data, x, y, level, width, height);
-                if (NativeMethods.Linux.GetError(Handle) is string)
-                    return false;
-                return true;
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    data = new byte[width * height * 4];
+                    NativeMethods.LinuxX64.ReadRegion(Handle, data, x, y, level, width, height);
+                    if (NativeMethods.Windows.GetError(Handle) is string)
+                        return false;
+                    return true;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    data = new byte[width * height * 4];
+                    NativeMethods.Linuxarm.ReadRegion(Handle, data, x, y, level, width, height);
+                    if (NativeMethods.Windows.GetError(Handle) is string)
+                        return false;
+                    return true;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    data = new byte[width * height * 4];
+                    NativeMethods.OSXx64.ReadRegion(Handle, data, x, y, level, width, height);
+                    if (NativeMethods.Windows.GetError(Handle) is string)
+                        return false;
+                    return true;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    data = new byte[width * height * 4];
+                    NativeMethods.OSXarm.ReadRegion(Handle, data, x, y, level, width, height);
+                    if (NativeMethods.Windows.GetError(Handle) is string)
+                        return false;
+                    return true;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                data = new byte[width * height * 4];
-                NativeMethods.OSX.ReadRegion(Handle, data, x, y, level, width, height);
-                if (NativeMethods.OSX.GetError(Handle) is string)
-                    return false;
-                return true;
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
+
         }
 
         ///<summary>
@@ -527,16 +719,39 @@ namespace OpenSlideGTK
             {
                 NativeMethods.Windows.Close(Handle);
                 Handle = IntPtr.Zero;
-            } else if (NativeMethods.isLinux)
+            }
+            else if (NativeMethods.isLinux)
             {
-                NativeMethods.Linux.Close(Handle);
-                Handle = IntPtr.Zero;
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    NativeMethods.LinuxX64.Close(Handle);
+                    Handle = IntPtr.Zero;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    NativeMethods.Linuxarm.Close(Handle);
+                    Handle = IntPtr.Zero;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    NativeMethods.OSXx64.Close(Handle);
+                    Handle = IntPtr.Zero;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    NativeMethods.OSXarm.Close(Handle);
+                    Handle = IntPtr.Zero;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                NativeMethods.OSX.Close(Handle);
-                Handle = IntPtr.Zero;
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
 
@@ -559,14 +774,35 @@ namespace OpenSlideGTK
                 if (NativeMethods.isWindows)
                 {
                     return CheckIfThrow(NativeMethods.Windows.GetPropertyValue(Handle, name));
-                } else if (NativeMethods.isLinux)
+                }
+                else if (NativeMethods.isLinux)
                 {
-                    return CheckIfThrow(NativeMethods.Linux.GetPropertyValue(Handle, name));
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.LinuxX64.GetPropertyValue(Handle, name));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.Linuxarm.GetPropertyValue(Handle, name));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                }
+                else if (NativeMethods.isOSX)
+                {
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXx64.GetPropertyValue(Handle, name));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXarm.GetPropertyValue(Handle, name));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                 }
                 else
-                {
-                    return CheckIfThrow(NativeMethods.OSX.GetPropertyValue(Handle, name));
-                }
+                    throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
             }
         }
         /// <summary>
@@ -581,14 +817,35 @@ namespace OpenSlideGTK
                 if (NativeMethods.isWindows)
                 {
                     return CheckIfThrow(NativeMethods.Windows.GetPropertyNames(Handle));
-                } else if (NativeMethods.isLinux)
+                }
+                else if (NativeMethods.isLinux)
                 {
-                    return CheckIfThrow(NativeMethods.Linux.GetPropertyNames(Handle));
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.LinuxX64.GetPropertyNames(Handle));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.Linuxarm.GetPropertyNames(Handle));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                }
+                else if (NativeMethods.isOSX)
+                {
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXx64.GetPropertyNames(Handle));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXarm.GetPropertyNames(Handle));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                 }
                 else
-                {
-                    return CheckIfThrow(NativeMethods.OSX.GetPropertyNames(Handle));
-                }
+                    throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
             }
         }
         /// <summary>
@@ -606,14 +863,37 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                value = NativeMethods.Linux.GetPropertyValue(Handle, name);
-                return value is string;
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    value = NativeMethods.LinuxX64.GetPropertyValue(Handle, name);
+                    return value is string;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    value = NativeMethods.Linuxarm.GetPropertyValue(Handle, name);
+                    return value is string;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    value = NativeMethods.OSXx64.GetPropertyValue(Handle, name);
+                    return value is string;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    value = NativeMethods.OSXarm.GetPropertyValue(Handle, name);
+                    return value is string;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                value = NativeMethods.OSX.GetPropertyValue(Handle, name);
-                return value is string;
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
+            
         }
 
         /// <summary>
@@ -632,14 +912,36 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                var value = CheckIfThrow(NativeMethods.Linux.GetPropertyValue(Handle, name));
-                return (T)Convert.ChangeType(value, typeof(T));
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var value = CheckIfThrow(NativeMethods.LinuxX64.GetPropertyValue(Handle, name));
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var value = CheckIfThrow(NativeMethods.Linuxarm.GetPropertyValue(Handle, name));
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    var value = CheckIfThrow(NativeMethods.OSXx64.GetPropertyValue(Handle, name));
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    var value = CheckIfThrow(NativeMethods.OSXarm.GetPropertyValue(Handle, name));
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                var value = CheckIfThrow(NativeMethods.OSX.GetPropertyValue(Handle, name));
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -678,12 +980,32 @@ namespace OpenSlideGTK
                 }
                 else if (NativeMethods.isLinux)
                 {
-                    return CheckIfThrow(NativeMethods.Linux.GetAssociatedImageNames(Handle));
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.LinuxX64.GetAssociatedImageNames(Handle));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.Linuxarm.GetAssociatedImageNames(Handle));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                }
+                else if (NativeMethods.isOSX)
+                {
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXx64.GetAssociatedImageNames(Handle));
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return CheckIfThrow(NativeMethods.OSXarm.GetAssociatedImageNames(Handle));
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                 }
                 else
-                {
-                    return CheckIfThrow(NativeMethods.OSX.GetAssociatedImageNames(Handle));
-                }
+                    throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
             }
         }
 
@@ -696,7 +1018,6 @@ namespace OpenSlideGTK
 
         public bool TryGetAssociatedImageDimensions(string name, out ImageDimension dimensions)
         {
-
             if (NativeMethods.isWindows)
             {
                 dimensions = default;
@@ -705,16 +1026,40 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                dimensions = default;
-                NativeMethods.Linux.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
-                return dimensions.Width >= 0 && dimensions.Height >= 0;
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    dimensions = default;
+                    NativeMethods.LinuxX64.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
+                    return dimensions.Width >= 0 && dimensions.Height >= 0;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    dimensions = default;
+                    NativeMethods.Linuxarm.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
+                    return dimensions.Width >= 0 && dimensions.Height >= 0;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    dimensions = default;
+                    NativeMethods.OSXx64.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
+                    return dimensions.Width >= 0 && dimensions.Height >= 0;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    dimensions = default;
+                    NativeMethods.OSXarm.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
+                    return dimensions.Width >= 0 && dimensions.Height >= 0;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                dimensions = default;
-                NativeMethods.OSX.GetAssociatedImageDimensions(Handle, name, out dimensions.width, out dimensions.height);
-                return dimensions.Width >= 0 && dimensions.Height >= 0;
-            }
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
         /// <summary>
@@ -749,13 +1094,32 @@ namespace OpenSlideGTK
                         }
                         else if (NativeMethods.isLinux)
                         {
-                            NativeMethods.Linux.ReadAssociatedImage(Handle, name, pdata);
+                            if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                            {
+                                NativeMethods.LinuxX64.ReadAssociatedImage(Handle, name, pdata);
+                            }
+                            else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                            {
+                                NativeMethods.Linuxarm.ReadAssociatedImage(Handle, name, pdata);
+                            }
+                            else
+                                throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                        }
+                        else if (NativeMethods.isOSX)
+                        {
+                            if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                            {
+                                NativeMethods.OSXx64.ReadAssociatedImage(Handle, name, pdata);
+                            }
+                            else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                            {
+                                NativeMethods.OSXarm.ReadAssociatedImage(Handle, name, pdata);
+                            }
+                            else
+                                throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                         }
                         else
-                        {
-                            NativeMethods.OSX.ReadAssociatedImage(Handle, name, pdata);
-                        }
-
+                            throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
                     }
                     image = new AssociatedImage(dimensions, dest);
                     return true;
@@ -810,13 +1174,32 @@ namespace OpenSlideGTK
                 }
                 else if (NativeMethods.isLinux)
                 {
-                    return NativeMethods.Linux.GetVersion();
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return NativeMethods.LinuxX64.GetVersion();
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return NativeMethods.Linuxarm.GetVersion();
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+                }
+                else if (NativeMethods.isOSX)
+                {
+                    if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                    {
+                        return NativeMethods.OSXx64.GetVersion();
+                    }
+                    else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    {
+                        return NativeMethods.OSXarm.GetVersion();
+                    }
+                    else
+                        throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
                 }
                 else
-                {
-                    return NativeMethods.OSX.GetVersion();
-                }
-                
+                    throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
             }
         }
 
@@ -836,25 +1219,56 @@ namespace OpenSlideGTK
             }
             else if (NativeMethods.isLinux)
             {
-                if (NativeMethods.Linux.GetError(Handle) is string error)
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
                 {
-                    if (isDispose)
-                        Dispose(true);
-                    throw new OpenSlideException(error);
+                    if (NativeMethods.LinuxX64.GetError(Handle) is string error)
+                    {
+                        if (isDispose)
+                            Dispose(true);
+                        throw new OpenSlideException(error);
+                    }
+                    return value;
                 }
-                return value;
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    if (NativeMethods.Linuxarm.GetError(Handle) is string error)
+                    {
+                        if (isDispose)
+                            Dispose(true);
+                        throw new OpenSlideException(error);
+                    }
+                    return value;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
+            }
+            else if (NativeMethods.isOSX)
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    if (NativeMethods.OSXx64.GetError(Handle) is string error)
+                    {
+                        if (isDispose)
+                            Dispose(true);
+                        throw new OpenSlideException(error);
+                    }
+                    return value;
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    if (NativeMethods.OSXarm.GetError(Handle) is string error)
+                    {
+                        if (isDispose)
+                            Dispose(true);
+                        throw new OpenSlideException(error);
+                    }
+                    return value;
+                }
+                else
+                    throw new NotSupportedException($"Unsupported architecture: {RuntimeInformation.ProcessArchitecture}");
             }
             else
-            {
-                if (NativeMethods.OSX.GetError(Handle) is string error)
-                {
-                    if (isDispose)
-                        Dispose(true);
-                    throw new OpenSlideException(error);
-                }
-                return value;
-            }
-            
+                throw new NotSupportedException($"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
 
