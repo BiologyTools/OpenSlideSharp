@@ -1184,7 +1184,7 @@ namespace OpenSlideGTK.Interop
             /// </summary>
             //public const string LibraryName = "libopenslide-1";
             //public const string LibraryName = "libopenslide.0.dylib";
-            public const string LibraryName = "/libopenslide.so.1";
+            public const string LibraryName = "/usr/lib/aarch64-linux-gnu/libopenslide.so.1";
             /// <summary>
             /// Quickly determine whether a whole slide image is recognized.
             /// </summary>
