@@ -168,6 +168,12 @@ namespace OpenSlideGTK
         {
             cache.Dispose();
         }
+
+        public void Clear()
+        {
+            cache.Dispose();
+            cache = new LruCache<Info, byte[]>(capacity);
+        }
     }
     public abstract class SlideSourceBase : ISlideSource, IDisposable
     {
