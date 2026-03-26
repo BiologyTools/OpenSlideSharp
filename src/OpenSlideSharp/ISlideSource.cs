@@ -89,7 +89,7 @@ namespace OpenSlideGTK
         private int capacity;
         private Stitch stitch;
         SlideSourceBase source = null;
-        public TileCache(SlideSourceBase source, int capacity = 100)
+        public TileCache(SlideSourceBase source, int capacity = 64)
         {
             this.source = source;
             this.capacity = capacity;
@@ -315,6 +315,11 @@ namespace OpenSlideGTK
             if (tiles == null || tiles.Count == 0)
                 return;
 
+            // Keep only the current viewport's tiles alive here. The GPU
+            // texture cache holds the persistent copy; retaining every prior
+            // GpuTile would keep old byte[] buffers rooted while panning.
+            stitch.gpuTiles.Clear();
+
             // --------------------------------------------------------------------
             // 1. Calculate viewport center (base-resolution coordinates)
             // --------------------------------------------------------------------
@@ -375,7 +380,7 @@ namespace OpenSlideGTK
             if (stitch == null)
                 stitch = new Stitch();
             if (cache == null)
-                cache = new TileCache(this, 200);
+                cache = new TileCache(this, 64);
             var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);
@@ -451,7 +456,7 @@ namespace OpenSlideGTK
             if (stitch == null)
                 stitch = new Stitch();
             if (cache == null)
-                cache = new TileCache(this, 200);
+                cache = new TileCache(this, 64);
             var curLevel = this.Schema.Resolutions[level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent, curLevel.Level);
@@ -526,7 +531,7 @@ namespace OpenSlideGTK
             if (stitch == null)
                 stitch = new Stitch();
             if (cache == null)
-                cache = new TileCache(this, 200);
+                cache = new TileCache(this, 64);
             var curLevel = this.Schema.Resolutions[this.level];
             var curUnitsPerPixel = sliceInfo.Resolution;
             var tileInfos = Schema.GetTileInfos(sliceInfo.Extent.WorldToPixelInvertedY(curUnitsPerPixel), curLevel.Level);

@@ -160,7 +160,7 @@ namespace OpenSlideGTK
             private LruCache<TileInformation, byte[]> cache;
             private int capacity;
             SlideSourceBase source = null;
-            public TileCache(SlideSourceBase source, int capacity = 200)
+            public TileCache(SlideSourceBase source, int capacity = 64)
             {
                 this.source = source;
                 this.capacity = capacity;
