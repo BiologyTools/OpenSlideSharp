@@ -85,17 +85,24 @@ namespace OpenSlideGTK
                 return null;
             if (_enableCache && _tileCache.Find(tileInfo.Index) is byte[] output)
                 return output;
-            var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
             
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
             var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
-            var curLevelOffsetXPixel = tileInfo.Extent.MinX / MinUnitsPerPixel;
-            var curLevelOffsetYPixel = -tileInfo.Extent.MaxY / MinUnitsPerPixel;
-            var curTileWidth = (int)(tileInfo.Extent.MaxX > Schema.Extent.Width ? tileWidth - (tileInfo.Extent.MaxX - Schema.Extent.Width) / r : tileWidth);
-            var curTileHeight = (int)(-tileInfo.Extent.MinY > Schema.Extent.Height ? tileHeight - (-tileInfo.Extent.MinY - Schema.Extent.Height) / r : tileHeight);
-            var bgraData = SlideImage.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, curTileWidth, curTileHeight);
+            // OpenSlide.ReadRegion expects level-0 reference coordinates. Derive
+            // the origin from the tile grid index so the read position stays aligned
+            // with the requested tile regardless of extent representation.
+            var downsample = SlideImage.GetLevelDownsample(tileInfo.Index.Level);
+            var curLevelOffsetXPixel = (long)Math.Round(tileInfo.Index.Col * tileWidth * downsample);
+            var curLevelOffsetYPixel = (long)Math.Round(tileInfo.Index.Row * tileHeight * downsample);
+
+            var bgraData = SlideImage.ReadRegion(
+                tileInfo.Index.Level,
+                curLevelOffsetXPixel,
+                curLevelOffsetYPixel,
+                tileWidth,
+                tileHeight);
             //We check to see if the data is valid.
-            if (bgraData.Length != curTileWidth * curTileHeight * 4)
+            if (bgraData.Length != tileWidth * tileHeight * 4)
                 return null;
             if (_enableCache && bgraData != null)
                 _tileCache.Add(tileInfo.Index, bgraData);

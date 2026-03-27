@@ -210,7 +210,6 @@ namespace OpenSlideGTK
             return null;
         }
         #endregion
-
         public abstract byte[] GetTile(TileInfo tileInfo);
         public async Task<byte[]> GetTileAsync(BruTile.TileInfo tileInfo, ZCT coord)
         {
@@ -222,15 +221,16 @@ namespace OpenSlideGTK
             {
                 return await cache.GetTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level));
             }
-            var r = Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
             var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
-            var curLevelOffsetXPixel = tileInfo.Extent.MinX / Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
-            var curLevelOffsetYPixel = -tileInfo.Extent.MaxY / Schema.Resolutions[tileInfo.Index.Level].UnitsPerPixel;
-            var curTileWidth = (int)(tileInfo.Extent.MaxX > Schema.Extent.Width ? tileWidth - (tileInfo.Extent.MaxX - Schema.Extent.Width) / r : tileWidth);
-            var curTileHeight = (int)(-tileInfo.Extent.MinY > Schema.Extent.Height ? tileHeight - (-tileInfo.Extent.MinY - Schema.Extent.Height) / r : tileHeight);
 
-            var bgraData = Image.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, curTileWidth, curTileHeight);
+            // OpenSlide.read_region takes level-0 coordinates. Use the tile grid
+            // index and the level downsample to derive the exact top-left origin
+            // instead of trusting the extent conversion here.
+            var downsample = Image.GetLevelDownsample(tileInfo.Index.Level);
+            var curLevelOffsetXPixel = (long)Math.Round(tileInfo.Index.Col * tileWidth * downsample);
+            var curLevelOffsetYPixel = (long)Math.Round(tileInfo.Index.Row * tileHeight * downsample);
+            var bgraData = Image.ReadRegion(tileInfo.Index.Level, (long)curLevelOffsetXPixel, (long)curLevelOffsetYPixel, tileWidth, tileHeight);
             cache.AddTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level), bgraData);
             return bgraData;
         }
@@ -416,12 +416,9 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    if (tileInfos.Count() > 0 && stitch.initialized)
+                    if (tileInfos.Count() > 0)
                         return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
-                    else
-                    {
-                        return null;
-                    }
+                    return null;
                 }
                 catch (Exception e)
                 {
@@ -490,12 +487,9 @@ namespace OpenSlideGTK
             {
                 try
                 {
-                    if (tileInfos.Count() > 0 && stitch.initialized)
+                    if (tileInfos.Count() > 0)
                         return stitch.StitchImages(tileInfos.ToList(), (int)Math.Round(dstPixelWidth), (int)Math.Round(dstPixelHeight), Math.Round(srcPixelExtent.MinX), Math.Round(srcPixelExtent.MinY), curUnitsPerPixel);
-                    else
-                    {
-                        return null;
-                    }
+                    return null;
                 }
                 catch (Exception e)
                 {
@@ -659,7 +653,7 @@ namespace OpenSlideGTK
             return bytes;
         }
 
-        public ITileSchema Schema { get; protected set; }
+        public ITileSchema Schema { get; set; }
 
         public string Name { get; protected set; }
 
