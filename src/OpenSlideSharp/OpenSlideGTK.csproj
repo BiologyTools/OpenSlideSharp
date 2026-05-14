@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Adds support for arm64 and x64 for Linux and MacOS.</PackageReleaseNotes>
+    <PackageReleaseNotes>Dependency updates.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET10 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
     <Version>2.6.0</Version>
     <Title>OpenSlideGTK</Title>
