@@ -20,6 +20,7 @@ namespace OpenSlideGTK
         private readonly int capacity;
         public Dictionary<Info, LinkedListNode<(Info key, TValue value)>> cacheMap = new Dictionary<Info, LinkedListNode<(Info key, TValue value)>>();
         private LinkedList<(Info key, TValue value)> lruList = new LinkedList<(Info key, TValue value)>();
+        private readonly object sync = new object();
 
         public LruCache(int capacity)
         {
@@ -28,44 +29,54 @@ namespace OpenSlideGTK
 
         public TValue Get(Info ke)
         {
-            foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+            lock (sync)
             {
-                if (ke.Coordinate == item.Value.key.Coordinate && ke.Index == item.Value.key.Index)
+                foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
                 {
-                    lruList.Remove(item);
-                    lruList.AddLast(item);
-                    return item.Value.value;
+                    if (ke.Coordinate == item.Value.key.Coordinate && ke.Index == item.Value.key.Index)
+                    {
+                        lruList.Remove(item);
+                        lruList.AddLast(item);
+                        return item.Value.value;
+                    }
                 }
+                return default(TValue);
             }
-            return default(TValue);
         }
 
         public void Add(Info key, TValue value)
         {
-            if (cacheMap.Count >= capacity)
+            lock (sync)
             {
-                var oldest = lruList.First;
-                if (oldest != null)
+                if (cacheMap.Count >= capacity)
                 {
-                    lruList.RemoveFirst();
-                    cacheMap.Remove(oldest.Value.key);
+                    var oldest = lruList.First;
+                    if (oldest != null)
+                    {
+                        lruList.RemoveFirst();
+                        cacheMap.Remove(oldest.Value.key);
+                    }
                 }
-            }
 
-            if (cacheMap.ContainsKey(key))
-            {
-                lruList.Remove(cacheMap[key]);
-            }
+                if (cacheMap.ContainsKey(key))
+                {
+                    lruList.Remove(cacheMap[key]);
+                }
 
-            var newNode = new LinkedListNode<(Info key, TValue value)>((key, value));
-            lruList.AddLast(newNode);
-            cacheMap[key] = newNode;
+                var newNode = new LinkedListNode<(Info key, TValue value)>((key, value));
+                lruList.AddLast(newNode);
+                cacheMap[key] = newNode;
+            }
         }
         public void Dispose()
         {
-            foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+            lock (sync)
             {
-                lruList.Remove(item);
+                foreach (LinkedListNode<(Info key, TValue value)> item in cacheMap.Values)
+                {
+                    lruList.Remove(item);
+                }
+                cacheMap.Clear();
             }
         }
     }

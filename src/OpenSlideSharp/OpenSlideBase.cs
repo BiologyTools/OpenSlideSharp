@@ -1,4 +1,4 @@
-﻿using BruTile;
+using BruTile;
 using BruTile.Cache;
 using System;
 using System.Collections.Generic;
@@ -31,7 +31,7 @@ namespace OpenSlideGTK
             {
                 YAxis = YAxis.OSM,
                 Format = "jpg",
-                Extent = new Extent(0, -height, width, 0),
+                Extent = new Extent(0, -height * MinUnitsPerPixel, width * MinUnitsPerPixel, 0),
                 OriginX = 0,
                 OriginY = 0,
             };
@@ -173,3 +173,4 @@ namespace OpenSlideGTK
         #endregion
     }
 }
+
