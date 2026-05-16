@@ -5,9 +5,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OpenSlideGTK</PackageId>
     <PackageTags>OpenSlide; GTK; Biology; Whole-Slide-Image; Slide-Image; Pyramidal-Image;</PackageTags>
-    <PackageReleaseNotes>Dependency updates.</PackageReleaseNotes>
+    <PackageReleaseNotes>Dependency updates, threading improvements.</PackageReleaseNotes>
     <Description>Cross platform Windows, Linux &amp; Mac .NET10 bindings for OpenSlide(https://openslide.org/), including DeepZoomGenerator</Description>
-    <Version>2.6.0</Version>
+    <Version>2.7.0</Version>
     <Title>OpenSlideGTK</Title>
     <Authors>Erik Repo; IOL0ol1;</Authors>
     <PackageIcon>openslide_logo.png</PackageIcon>
@@ -51,7 +51,7 @@
     <PackageReference Include="Mapsui.Tiling" Version="5.0.2" />
     <PackageReference Include="NetVips" Version="3.2.0" />
     <PackageReference Include="OpenTK" Version="4.9.4" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="4.0.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
   
 </Project>
