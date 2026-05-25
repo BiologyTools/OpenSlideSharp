@@ -30,41 +30,56 @@ namespace OpenSlideGTK
     {
         private OpenGLStitcher stitcher;
         private TileTextureCache textureCache = new TileTextureCache();
+        private readonly object sync = new object();
         public bool initialized = false;
         public List<GpuTile> gpuTiles = new();
         
         // Public tile query methods
         public bool HasTile(TileIndex ex)
         {
-            return gpuTiles.Any(item => item.Index == ex);
+            lock (sync)
+            {
+                return gpuTiles.Any(item => item.Index == ex);
+            }
         }
 
         public bool HasTile(TileInfo t)
         {
-            return gpuTiles.Any(item => item.Index == t.Index);
+            lock (sync)
+            {
+                return gpuTiles.Any(item => item.Index == t.Index);
+            }
         }
 
         public bool HasTile(Extent t)
         {
-            return gpuTiles.Any(item => item.Extent == t);
+            lock (sync)
+            {
+                return gpuTiles.Any(item => item.Extent == t);
+            }
         }
 
         // Tile management operations
         public void DisposeLevel(int level)
         {
-            var tilesToRemove = gpuTiles.Where(item => item.Index.Level == level).ToList();
-            foreach (var tile in tilesToRemove)
+            lock (sync)
             {
-                textureCache?.ReleaseTexture(tile.Index);
-                gpuTiles.Remove(tile);
+                var tilesToRemove = gpuTiles.Where(item => item.Index.Level == level).ToList();
+                foreach (var tile in tilesToRemove)
+                {
+                    textureCache?.ReleaseTexture(tile.Index);
+                    gpuTiles.Remove(tile);
+                }
             }
         }
         public void AddTile(GpuTile tfi)
         {
-            if (HasTile(tfi.Index))
-                return;
-            gpuTiles.Add(tfi);
-            textureCache.UploadTexture(tfi.Index, tfi.Bytes, 256, 256);
+            lock (sync)
+            {
+                if (HasTile(tfi.Index))
+                    return;
+                gpuTiles.Add(tfi);
+            }
         }
 
         // Initialization
@@ -100,9 +115,14 @@ namespace OpenSlideGTK
             try
             {
                 Initialize();
+                List<GpuTile> gpuTileSnapshot;
+                lock (sync)
+                {
+                    gpuTileSnapshot = gpuTiles.ToList();
+                }
                 return stitcher.Render(
                     tiles,
-                    gpuTiles,
+                    gpuTileSnapshot,
                     textureCache,
                     pxwidth,
                     pxheight,
@@ -356,6 +376,8 @@ void main()
             int tex = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture2D, tex);
 
+            pixelData = NormalizeToBgra(pixelData, width, height);
+
             var handle = GCHandle.Alloc(pixelData, GCHandleType.Pinned);
             try
             {
@@ -374,6 +396,66 @@ void main()
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
 
             textureCache[index] = tex;
+        }
+
+        private static byte[] NormalizeToBgra(byte[] pixelData, int width, int height)
+        {
+            if (pixelData == null)
+                return new byte[width * height * 4];
+
+            int expectedRgbaBytes = width * height * 4;
+            if (pixelData.Length == expectedRgbaBytes)
+                return pixelData;
+
+            int pixels = width * height;
+            if (pixelData.Length == pixels)
+            {
+                byte[] bgra = new byte[expectedRgbaBytes];
+                for (int i = 0; i < pixels; i++)
+                {
+                    byte g = pixelData[i];
+                    int d = i * 4;
+                    bgra[d + 0] = g;
+                    bgra[d + 1] = g;
+                    bgra[d + 2] = g;
+                    bgra[d + 3] = 255;
+                }
+                return bgra;
+            }
+
+            if (pixelData.Length == pixels * 2)
+            {
+                byte[] bgra = new byte[expectedRgbaBytes];
+                ushort min = ushort.MaxValue;
+                ushort max = ushort.MinValue;
+                for (int i = 0; i < pixels; i++)
+                {
+                    int s = i * 2;
+                    ushort v = (ushort)(pixelData[s] | (pixelData[s + 1] << 8));
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                if (max <= min)
+                    max = (ushort)(min + 1);
+                float scale = 255f / (max - min);
+                for (int i = 0; i < pixels; i++)
+                {
+                    int s = i * 2;
+                    ushort v = (ushort)(pixelData[s] | (pixelData[s + 1] << 8));
+                    byte g = (byte)System.Math.Clamp((v - min) * scale, 0f, 255f);
+                    int d = i * 4;
+                    bgra[d + 0] = g;
+                    bgra[d + 1] = g;
+                    bgra[d + 2] = g;
+                    bgra[d + 3] = 255;
+                }
+                return bgra;
+            }
+
+            // Fallback: preserve as much as possible and pad/truncate to RGBA.
+            byte[] fallback = new byte[expectedRgbaBytes];
+            System.Buffer.BlockCopy(pixelData, 0, fallback, 0, Math.Min(pixelData.Length, expectedRgbaBytes));
+            return fallback;
         }
 
         public int GetTexture(TileIndex index)

@@ -326,6 +326,9 @@ namespace OpenSlideGTK
             if (tiles == null || tiles.Count == 0)
                 return;
 
+            if (stitch == null)
+                stitch = new Stitch();
+
             // Keep only the current viewport's tiles alive here. The GPU
             // texture cache holds the persistent copy; retaining every prior
             // GpuTile would keep old byte[] buffers rooted while panning.
