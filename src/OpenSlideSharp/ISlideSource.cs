@@ -232,6 +232,15 @@ namespace OpenSlideGTK
             {
                 return await cache.GetTile(new Info(coord, tileInfo.Index, tileInfo.Extent, tileInfo.Index.Level));
             }
+
+            if (this is OpenSlideBase openSlideBase)
+            {
+                TileInfo tf = new TileInfo();
+                tf.Index = tileInfo.Index;
+                tf.Extent = tileInfo.Extent;
+                return openSlideBase.GetTile(tf);
+            }
+
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
             var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
 

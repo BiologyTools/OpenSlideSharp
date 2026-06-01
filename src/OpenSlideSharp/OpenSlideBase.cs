@@ -15,12 +15,14 @@ namespace OpenSlideGTK
         public readonly OpenSlideImage SlideImage;
         private readonly bool _enableCache;
         private readonly MemoryCache<byte[]> _tileCache = new MemoryCache<byte[]>();
+        private readonly int _nativeLevelCount;
 
         public OpenSlideBase(string source, bool enableCache = true)
         {
             Source = source;
             _enableCache = enableCache;
             SlideImage = OpenSlideImage.Open(source);
+            _nativeLevelCount = SlideImage.LevelCount;
             var minUnitsPerPixel = SlideImage.MicronsPerPixelX ?? SlideImage.MicronsPerPixelY ?? 1;
             MinUnitsPerPixel = UseRealResolution ? minUnitsPerPixel : 1;
             if (MinUnitsPerPixel <= 0) MinUnitsPerPixel = 1;
@@ -36,11 +38,36 @@ namespace OpenSlideGTK
                 OriginY = 0,
             };
             InitResolutions(Schema.Resolutions, 256, 256);
+            AppendSyntheticPyramidLevels(256, 256);
         }
 
         public static string DetectVendor(string source)
         {
             return OpenSlideImage.DetectVendor(source);
+        }
+
+        private (int Width, int Height) GetSyntheticLevelDimension(int level)
+        {
+            if (level < _nativeLevelCount)
+            {
+                var dim = SlideImage.GetLevelDimension(level);
+                return ((int)dim.Width, (int)dim.Height);
+            }
+
+            double downsample = GetSyntheticLevelDownsample(level);
+            int width = Math.Max(1, (int)Math.Ceiling(SlideImage.Dimensions.Width / downsample));
+            int height = Math.Max(1, (int)Math.Ceiling(SlideImage.Dimensions.Height / downsample));
+            return (width, height);
+        }
+
+        private double GetSyntheticLevelDownsample(int level)
+        {
+            if (level < _nativeLevelCount)
+                return SlideImage.GetLevelDownsample(level);
+
+            double nativeDownsample = SlideImage.GetLevelDownsample(_nativeLevelCount - 1);
+            int syntheticStep = level - _nativeLevelCount + 1;
+            return nativeDownsample * Math.Pow(2.0, syntheticStep);
         }
 
         
@@ -88,6 +115,73 @@ namespace OpenSlideGTK
             
             var tileWidth = Schema.Resolutions[tileInfo.Index.Level].TileWidth;
             var tileHeight = Schema.Resolutions[tileInfo.Index.Level].TileHeight;
+
+            if (_nativeLevelCount > 0 && tileInfo.Index.Level >= _nativeLevelCount)
+            {
+                int sourceLevel = _nativeLevelCount - 1;
+                var sourceDim = SlideImage.GetLevelDimension(sourceLevel);
+                var targetDim = GetSyntheticLevelDimension(tileInfo.Index.Level);
+                double sourceDownsample = SlideImage.GetLevelDownsample(sourceLevel);
+                double targetDownsample = GetSyntheticLevelDownsample(tileInfo.Index.Level);
+                double sourceScale = targetDownsample / Math.Max(1e-9, sourceDownsample);
+                int targetX = tileInfo.Index.Col * tileWidth;
+                int targetY = tileInfo.Index.Row * tileHeight;
+                int overlapW = Math.Max(0, Math.Min(tileWidth, targetDim.Width - targetX));
+                int overlapH = Math.Max(0, Math.Min(tileHeight, targetDim.Height - targetY));
+                byte[] syntheticTile = new byte[tileWidth * tileHeight * 4];
+
+                if (overlapW <= 0 || overlapH <= 0)
+                    return syntheticTile;
+
+                int targetX2 = Math.Min(targetDim.Width, targetX + tileWidth);
+                int targetY2 = Math.Min(targetDim.Height, targetY + tileHeight);
+                long sourceX = Math.Max(0, (long)Math.Floor(targetX * sourceScale));
+                long sourceY = Math.Max(0, (long)Math.Floor(targetY * sourceScale));
+                long sourceX2 = Math.Max(sourceX + 1, (long)Math.Ceiling(targetX2 * sourceScale));
+                long sourceY2 = Math.Max(sourceY + 1, (long)Math.Ceiling(targetY2 * sourceScale));
+                int sourceTileWidth = Math.Max(1, (int)(sourceX2 - sourceX));
+                int sourceTileHeight = Math.Max(1, (int)(sourceY2 - sourceY));
+                long level0SourceX = (long)Math.Round(sourceX * sourceDownsample);
+                long level0SourceY = (long)Math.Round(sourceY * sourceDownsample);
+
+                if (sourceX >= sourceDim.Width || sourceY >= sourceDim.Height)
+                    return syntheticTile;
+
+                if (sourceX + sourceTileWidth > sourceDim.Width)
+                    sourceTileWidth = Math.Max(1, (int)(sourceDim.Width - sourceX));
+                if (sourceY + sourceTileHeight > sourceDim.Height)
+                    sourceTileHeight = Math.Max(1, (int)(sourceDim.Height - sourceY));
+
+                var sourceData = SlideImage.ReadRegion(
+                    sourceLevel,
+                    level0SourceX,
+                    level0SourceY,
+                    sourceTileWidth,
+                    sourceTileHeight);
+
+                if (sourceData == null || sourceData.Length == 0)
+                    return syntheticTile;
+
+                try
+                {
+                    var loaded = global::SixLabors.ImageSharp.Image.LoadPixelData<Bgra32>(sourceData, sourceTileWidth, sourceTileHeight);
+                    loaded.Mutate(x => x.Resize(overlapW, overlapH));
+                    byte[] resized = new byte[overlapW * overlapH * 4];
+                    loaded.CopyPixelDataTo(resized);
+                    for (int row = 0; row < overlapH; row++)
+                    {
+                        int srcOffset = row * overlapW * 4;
+                        int dstOffset = row * tileWidth * 4;
+                        Buffer.BlockCopy(resized, srcOffset, syntheticTile, dstOffset, overlapW * 4);
+                    }
+                    return syntheticTile;
+                }
+                catch
+                {
+                    return syntheticTile;
+                }
+            }
+
             // OpenSlide.ReadRegion expects level-0 reference coordinates. Derive
             // the origin from the tile grid index so the read position stays aligned
             // with the requested tile regardless of extent representation.
@@ -150,6 +244,50 @@ namespace OpenSlideGTK
                 var tw = useInternalSize ? w : tileWidth;
                 var th = useInternalSize ? h : tileHeight;
                 resolutions.Add(i, new Resolution(i, MinUnitsPerPixel * SlideImage.GetLevelDownsample(i), tw, th));
+            }
+        }
+
+        private void AppendSyntheticPyramidLevels(int tileWidth, int tileHeight)
+        {
+            if (_nativeLevelCount <= 0)
+                return;
+
+            int level = _nativeLevelCount;
+            while (true)
+            {
+                var dim = GetSyntheticLevelDimension(level);
+                if (dim.Width <= 1 && dim.Height <= 1)
+                {
+                    double unitsPerPixel = MinUnitsPerPixel * GetSyntheticLevelDownsample(level);
+                    Schema.Resolutions[level] = new BruTile.Resolution(level, unitsPerPixel, tileWidth, tileHeight);
+                    break;
+                }
+
+                double levelDownsample = MinUnitsPerPixel * GetSyntheticLevelDownsample(level);
+                Schema.Resolutions[level] = new BruTile.Resolution(level, levelDownsample, tileWidth, tileHeight);
+                level++;
+            }
+        }
+
+        private void AppendSyntheticPyramidLevelsLegacy(int tileWidth, int tileHeight)
+        {
+            if (_nativeLevelCount <= 0)
+                return;
+
+            int level = _nativeLevelCount;
+            int width = (int)SlideImage.GetLevelDimension(_nativeLevelCount - 1).Width;
+            int height = (int)SlideImage.GetLevelDimension(_nativeLevelCount - 1).Height;
+            double unitsPerPixel = Schema.Resolutions[_nativeLevelCount - 1].UnitsPerPixel;
+
+            while (width > 1 || height > 1)
+            {
+                width = Math.Max(1, (int)Math.Ceiling(width / 2.0));
+                height = Math.Max(1, (int)Math.Ceiling(height / 2.0));
+                unitsPerPixel *= 2.0;
+                Schema.Resolutions[level] = new BruTile.Resolution(level, unitsPerPixel, tileWidth, tileHeight);
+                level++;
+                if (width == 1 && height == 1)
+                    break;
             }
         }
 
