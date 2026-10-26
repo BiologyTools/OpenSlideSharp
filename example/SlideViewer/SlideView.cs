@@ -12,9 +12,6 @@ using Mapsui.Tiling.Layers;
 using Mapsui.Tiling.Fetcher;
 using OpenSlideGTK;
 using BioLib;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
 using AForge;
 using SliceInfo = BioLib.SliceInfo;
 using ISlideSource = OpenSlideGTK.ISlideSource;
@@ -98,16 +95,6 @@ namespace SlideViewer
         private void PictureBox_SizeAllocated(object o, SizeAllocatedArgs args)
         {
             MainMap.Navigator.SetSize(pictureBox.AllocatedWidth,pictureBox.AllocatedHeight);
-        }
-        static byte[] ImageToByteArray(Image<Rgb24> image)
-        {
-            using (MemoryStream memoryStream = new MemoryStream())
-            {
-                // Save the image to the MemoryStream using PNG format
-                // You can change the format to JPEG or any other supported format
-                image.Save(memoryStream, new PngEncoder());
-                return memoryStream.ToArray();
-            }
         }
         private void PictureBox_Drawn(object o, DrawnArgs e)
         {

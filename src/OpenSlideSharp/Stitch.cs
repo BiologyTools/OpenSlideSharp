@@ -12,8 +12,6 @@ using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Windowing.Desktop;
 using Pango;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

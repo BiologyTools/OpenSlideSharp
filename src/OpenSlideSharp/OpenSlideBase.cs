@@ -4,9 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace OpenSlideGTK
 {
@@ -86,26 +83,6 @@ namespace OpenSlideGTK
             return images;
             */
         }
-        private static Image<Rgb24> CreateImageFromRgbaData(byte[] rgbaData, int width, int height)
-        {
-            Image<Rgb24> image = new Image<Rgb24>(width, height);
-
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    int index = (y * width + x) * 4;
-                    byte r = rgbaData[index];
-                    byte g = rgbaData[index + 1];
-                    byte b = rgbaData[index + 2];
-                    // byte a = rgbaData[index + 3]; // Alpha channel, not used in Rgb24
-
-                    image[x, y] = new Rgb24(r, g, b);
-                }
-            }
-
-            return image;
-        }
         public override byte[] GetTile(TileInfo tileInfo)
         {
             if (tileInfo == null)
@@ -164,15 +141,18 @@ namespace OpenSlideGTK
 
                 try
                 {
-                    var loaded = global::SixLabors.ImageSharp.Image.LoadPixelData<Bgra32>(sourceData, sourceTileWidth, sourceTileHeight);
-                    loaded.Mutate(x => x.Resize(overlapW, overlapH));
-                    byte[] resized = new byte[overlapW * overlapH * 4];
-                    loaded.CopyPixelDataTo(resized);
-                    for (int row = 0; row < overlapH; row++)
+                    for (int targetRow = 0; targetRow < overlapH; targetRow++)
                     {
-                        int srcOffset = row * overlapW * 4;
-                        int dstOffset = row * tileWidth * 4;
-                        Buffer.BlockCopy(resized, srcOffset, syntheticTile, dstOffset, overlapW * 4);
+                        int sourceRow = Math.Min(sourceTileHeight - 1,
+                            (int)((long)targetRow * sourceTileHeight / overlapH));
+                        for (int targetColumn = 0; targetColumn < overlapW; targetColumn++)
+                        {
+                            int sourceColumn = Math.Min(sourceTileWidth - 1,
+                                (int)((long)targetColumn * sourceTileWidth / overlapW));
+                            int sourceOffset = (sourceRow * sourceTileWidth + sourceColumn) * 4;
+                            int targetOffset = (targetRow * tileWidth + targetColumn) * 4;
+                            Buffer.BlockCopy(sourceData, sourceOffset, syntheticTile, targetOffset, 4);
+                        }
                     }
                     return syntheticTile;
                 }

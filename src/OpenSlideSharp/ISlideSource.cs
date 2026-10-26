@@ -3,8 +3,6 @@ using Atk;
 using BruTile;
 using Gdk;
 using Gtk;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -633,49 +631,6 @@ namespace OpenSlideGTK
             return null;
         }
         */
-        public byte[] GetRgb24Bytes(Image<Rgb24> image)
-        {
-            if (image == null)
-                return new byte[1];
-            int width = image.Width;
-            int height = image.Height;
-            byte[] rgbBytes = new byte[width * height * 3]; // 3 bytes per pixel (RGB)
-
-            int byteIndex = 0;
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    Rgb24 pixel = image[x, y];
-                    rgbBytes[byteIndex++] = pixel.R;
-                    rgbBytes[byteIndex++] = pixel.G;
-                    rgbBytes[byteIndex++] = pixel.B;
-                }
-            }
-
-            return rgbBytes;
-        }
-        public byte[] Get16Bytes(Image<L16> image)
-        {
-            int width = image.Width;
-            int height = image.Height;
-            byte[] bytes = new byte[width * height * 2];
-
-            int byteIndex = 0;
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    L16 pixel = image[x, y];
-                    byte[] bts = BitConverter.GetBytes(pixel.PackedValue);
-                    bytes[byteIndex++] = bts[0];
-                    bytes[byteIndex++] = bts[1];
-                }
-            }
-
-            return bytes;
-        }
-
         public ITileSchema Schema { get; set; }
 
         public string Name { get; protected set; }
