@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;win-arm64;osx-x64;osx-arm64;</RuntimeIdentifiers>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.2.0</Version>
@@ -17,16 +17,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BioLib" Version="3.3.0" />
-    <PackageReference Include="BruTile" Version="5.0.6" />
+    <PackageReference Include="BioLib" Version="4.1.0" />
+    <PackageReference Include="BruTile" Version="6.0.0" />
     <PackageReference Include="GtkSharp" Version="3.24.24.95" />
-    <PackageReference Include="Mapsui" Version="4.1.8" />
-    <PackageReference Include="Mapsui.Extensions" Version="4.1.8" />
-    <PackageReference Include="Mapsui.Tiling" Version="4.1.8" />
-    <PackageReference Include="NetVips" Version="3.0.0" />
-    <PackageReference Include="NetVips.Native.win-x64" Version="8.16.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Packaging.Targets" Version="0.1.226">
+    <PackageReference Include="Mapsui" Version="5.1.0" />
+    <PackageReference Include="Mapsui.Extensions" Version="5.1.0" />
+    <PackageReference Include="Mapsui.Tiling" Version="5.1.0" />
+    <PackageReference Include="NetVips" Version="3.2.0" />
+    <PackageReference Include="NetVips.Native.win-x64" Version="8.18.7" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Packaging.Targets" Version="0.1.232">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -43,11 +43,5 @@
     <Content Update="C:\Users\Erikr\.nuget\packages\biolib\1.7.0\contentFiles\any\net6.0\bioformats_package.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Reference Include="bioformats_package">
-      <HintPath>bioformats_package.dll</HintPath>
-    </Reference>
   </ItemGroup>
 </Project>
